@@ -1,0 +1,44 @@
+# The family's only cross-emulator gate. Each emulator's own CI tests itself
+# from source; this runs the PUBLISHED images together and proves they still
+# trust each other — which is what a bad PUBLIC_ORIGIN or *_ENTRA_ISSUER
+# breaks, silently, while every upstream suite stays green.
+#
+# Scheduled because the failure mode arrives from OUTSIDE this repo: a new
+# :latest published by any of the four can break the family without a commit
+# landing here.
+name: Family chain
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '17 6 * * *' # daily, 06:17 UTC — catches upstream :latest drift
+  workflow_dispatch:
+
+concurrency:
+  group: chain-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  chain:
+    name: Published images compose and trust each other
+    runs-on: ubuntu-latest # Docker + compose preinstalled
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Validate the compose file
+        run: |
+          docker compose -f docker-compose.yml config >/dev/null
+          docker compose -f docker-compose.yml --profile fabric config >/dev/null
+
+      - name: Run the chain
+        run: ./e2e/chain/run.py
+
+      - name: Diagnose on failure
+        if: failure()
+        run: |
+          docker compose -p azure-emulators-e2e -f docker-compose.yml ps || true
+          docker compose -p azure-emulators-e2e -f docker-compose.yml logs --tail 100 || true

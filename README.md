@@ -75,11 +75,35 @@ Nothing mounts a volume, so nothing survives `docker compose down` — see the
 notes at the top of [`docker-compose.yml`](docker-compose.yml) for how to add
 one, and for the keyvault image's current `/data` ownership caveat.
 
+## The chain test
+
+[`e2e/chain/run.py`](e2e/chain/run.py) is the gate this repo exists for. It
+brings the **published images** up with `docker compose up --wait`, then proves
+the seam:
+
+1. every service reports healthy;
+2. entra mints a token per audience (ARM, Key Vault);
+3. **arm accepts entra's token** and performs a real write (a resource group);
+4. **keyvault authenticates entra's token** on a real data-plane call;
+5. a **foreign-issuer token is refused** — so steps 3–4 passed because the trust
+   chain holds, not because validation is missing.
+
+```sh
+./e2e/chain/run.py          # pulls :latest, runs, tears down
+KEEP_UP=1 ./e2e/chain/run.py    # leave the stack up to poke at
+```
+
+It runs under its own compose project on high ports (18443/18444/18445), so it
+never collides with a family stack you already have running. CI runs it on every
+push **and daily** — the failure mode arrives from outside this repo, when any
+of the four publishes a new `:latest`.
+
+For the *semantics* of ARM→vault authorization (role assignments, access
+policies, revocation), see azure-keyvault-emulator's `e2e/arm-chain`, which
+covers that in depth from source. This repo deliberately tests the seam, not
+the semantics.
+
 ## Roadmap
 
-- **`e2e/chain/`** — the cross-emulator smoke test this repo is for: acquire a
-  token from entra, read a secret from keyvault, create a resource + role
-  assignment in arm, all with one unmodified Azure SDK client.
-- **CI** — run that chain against the published images on a schedule and on
-  every version bump, so a breaking change in any one emulator surfaces here.
 - **Renovate/dependabot** — keep the pinned image versions moving.
+- **`az` CLI leg** — drive the same chain through the real Azure CLI.
