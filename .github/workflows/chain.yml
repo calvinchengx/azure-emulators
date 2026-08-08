@@ -1,11 +1,24 @@
 # The family's only cross-emulator gate. Each emulator's own CI tests itself
-# from source; this runs the PUBLISHED images together and proves they still
-# trust each other — which is what a bad PUBLIC_ORIGIN or *_ENTRA_ISSUER
-# breaks, silently, while every upstream suite stays green.
+# from source; this runs PUBLISHED images together and proves they still trust
+# each other — which is what a bad PUBLIC_ORIGIN or *_ENTRA_ISSUER breaks,
+# silently, while every upstream suite stays green.
 #
-# Scheduled because the failure mode arrives from OUTSIDE this repo: a new
-# :latest published by any of the four can break the family without a commit
-# landing here.
+# Two jobs with two meanings, so a red always says whose problem it is:
+#
+#   certified  the BOM (docker-compose.yml's version defaults). Runs on every
+#              push and PR. A red here means THIS REPO is broken — the
+#              certified set no longer composes — and blocks the merge.
+#
+#   drift      :latest across the board. Runs nightly, because this failure
+#              mode arrives from OUTSIDE: any of the four repos can publish a
+#              release that breaks the family without a commit landing here.
+#              A red here means an upstream release needs triage and the BOM
+#              is your rollback — a bare `docker compose up` still works.
+#
+#   pins       the consumer repos' own release pins (keyvault's e2e installs,
+#              fabric's fab-driven example) agree with the BOM, so "certified"
+#              means the same family everywhere. go.mod library versions are
+#              warn-only — a stale one is that repo's own latent problem.
 name: Family chain
 
 on:
@@ -18,27 +31,53 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: chain-${{ github.ref }}
+  group: chain-${{ github.ref }}-${{ github.event_name == 'schedule' && 'drift' || 'certified' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  chain:
-    name: Published images compose and trust each other
+  certified:
+    name: The BOM composes and trusts itself
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest # Docker + compose preinstalled
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
-
       - name: Validate the compose file
         run: |
           docker compose -f docker-compose.yml config >/dev/null
           docker compose -f docker-compose.yml --profile fabric config >/dev/null
-
-      - name: Run the chain
+      - name: Run the chain (BOM versions)
         run: ./e2e/chain/run.py
-
       - name: Diagnose on failure
         if: failure()
         run: |
           docker compose -p azure-emulators-e2e -f docker-compose.yml ps || true
           docker compose -p azure-emulators-e2e -f docker-compose.yml logs --tail 100 || true
+
+  drift:
+    name: Does :latest still compose? (nightly)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ENTRA_EMULATOR_VERSION: latest
+      KEYVAULT_EMULATOR_VERSION: latest
+      ARM_EMULATOR_VERSION: latest
+      FABRIC_EMULATOR_VERSION: latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Run the chain (:latest)
+        run: ./e2e/chain/run.py
+      - name: Diagnose on failure
+        if: failure()
+        run: |
+          docker compose -p azure-emulators-e2e -f docker-compose.yml ps || true
+          docker compose -p azure-emulators-e2e -f docker-compose.yml logs --tail 100 || true
+
+  pins:
+    name: Consumer release pins match the BOM
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - run: ./scripts/check_family_pins.py

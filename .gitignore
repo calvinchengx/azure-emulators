@@ -1,1 +1,6 @@
 .DS_Store
+
+# Local version overrides for docker compose (see the BOM note in
+# docker-compose.yml). Never committed — the certified versions live in the
+# compose file itself.
+.env

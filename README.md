@@ -60,13 +60,12 @@ real tenant instead and nothing else changes.
 
 ## Pinning versions
 
-`latest` by default so the quickstart stays current. Pin a known-good set with:
+The compose defaults ARE a pinned, certified set — the BOM (see
+[Release coordination](#release-coordination-the-bom)). Override any member
+per run:
 
 ```sh
-ENTRA_EMULATOR_VERSION=0.2.2 \
-KEYVAULT_EMULATOR_VERSION=0.1.4 \
-ARM_EMULATOR_VERSION=0.1.0 \
-  docker compose up -d
+ENTRA_EMULATOR_VERSION=latest docker compose up -d   # try tomorrow's entra
 ```
 
 ## State
@@ -89,14 +88,46 @@ the seam:
    chain holds, not because validation is missing.
 
 ```sh
-./e2e/chain/run.py          # pulls :latest, runs, tears down
+./e2e/chain/run.py          # runs the BOM versions, tears down
 KEEP_UP=1 ./e2e/chain/run.py    # leave the stack up to poke at
 ```
 
 It runs under its own compose project on high ports (18443/18444/18445), so it
-never collides with a family stack you already have running. CI runs it on every
-push **and daily** — the failure mode arrives from outside this repo, when any
-of the four publishes a new `:latest`.
+never collides with a family stack you already have running.
+
+## Release coordination: the BOM
+
+The version defaults in [`docker-compose.yml`](docker-compose.yml) —
+`${ENTRA_EMULATOR_VERSION:-0.4.0}` and friends — are the family's **bill of
+materials**: the newest combination of released images proven to work
+together. A bare `docker compose up` runs exactly that set; per-variable
+overrides (environment or an uncommitted local `.env`) still win.
+
+CI gives each failure a name:
+
+| job | versions | a red means |
+|---|---|---|
+| `certified` (push/PR) | the BOM | this repo is broken — blocks merge |
+| `drift` (nightly) | `:latest` | an upstream release broke the family — triage; the BOM is the rollback |
+| `pins` (push/PR) | — | a consumer repo certifies against a different family than this one |
+
+**To release across the family:**
+
+1. Release the emulator in its own repo — and a release is not done at the
+   tag: the GoReleaser run must finish **and** the GHCR image must exist. (The
+   Go module proxy can carry a new version for minutes while `:latest` is
+   still the previous image.)
+2. When the change is breaking, entra goes first — it is upstream of
+   everything (`entra → arm → keyvault`, `entra → fabric`) — and its consumers'
+   own pins (keyvault's e2e `ENTRA_VERSION`, fabric's fab-driven `.env`,
+   each repo's `go.mod`) move next. The `pins` job holds you to this.
+3. Open a PR here bumping the compose default. The `certified` job proves the
+   new combination before it merges. That merge *is* the family release.
+
+The 2026-08-08 tenant break is the motivating incident: a consumer was swept
+to entra's unreleased main, and 12 CI jobs went red hours later on an innocent
+commit. Under this scheme the same mistake fails the `pins` job immediately,
+named for what it is.
 
 For the *semantics* of ARM→vault authorization (role assignments, access
 policies, revocation), see azure-keyvault-emulator's `e2e/arm-chain`, which

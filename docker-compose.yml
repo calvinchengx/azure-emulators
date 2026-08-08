@@ -25,8 +25,19 @@
 # *_ENTRA_ISSUER repeats it verbatim. Point them at a real tenant instead and
 # nothing else changes.
 #
-# Versions are overridable so consumers can pin a known-good release:
-#   ENTRA_EMULATOR_VERSION=0.2.2 docker compose up -d
+# THE VERSION DEFAULTS BELOW ARE THE FAMILY BOM. A bare `docker compose up`
+# runs the newest combination proven to work together by this repo's chain
+# test — that green is what "certified" means. To bump, change a default and
+# open a PR; the chain certifies the new set before it merges. Overrides still
+# work, per variable, via the environment or an uncommitted local .env:
+#   ENTRA_EMULATOR_VERSION=0.3.1 docker compose up -d      # ad hoc
+#   ENTRA_EMULATOR_VERSION=latest                          # what the nightly
+#                                                          # drift job does
+#
+# Release ordering when a bump is breaking: entra first — it is upstream of
+# everything — and a release is not done at the tag. The GoReleaser run must
+# finish AND the GHCR image must exist; the Go module proxy can carry a new
+# version for many minutes while :latest is still the previous image.
 #
 # NO STATE SURVIVES HERE. Nothing mounts a volume, so nothing outlives
 # `docker compose down`. Every image bakes <PREFIX>_DATA_DIR=/data for callers
@@ -41,10 +52,14 @@
 # database file" until that image chowns /data as arm's and fabric's do.
 
 x-entra-tenant: &tenant "6f89cf12-978b-4d23-ac18-9ef0c127cf87"
+# The subscription every ARM resource lives under. Stated here rather than
+# relying on arm's baked default, because the chain test writes into it and
+# released arms (≤0.1.1) still default to the older zero-GUID.
+x-arm-subscription: &subscription "6082bfda-63d0-46f4-8272-ae9195139feb"
 
 services:
   entra-emulator:
-    image: ghcr.io/calvinchengx/entra-emulator:${ENTRA_EMULATOR_VERSION:-latest}
+    image: ghcr.io/calvinchengx/entra-emulator:${ENTRA_EMULATOR_VERSION:-0.4.0}
     environment:
       ORIGIN_MODE: compat # single origin, path-prefixed surfaces
       PUBLIC_ORIGIN: "https://entra-emulator:8443"
@@ -57,7 +72,7 @@ services:
       retries: 10
 
   keyvault-emulator:
-    image: ghcr.io/calvinchengx/azure-keyvault-emulator:${KEYVAULT_EMULATOR_VERSION:-latest}
+    image: ghcr.io/calvinchengx/azure-keyvault-emulator:${KEYVAULT_EMULATOR_VERSION:-0.4.0}
     depends_on:
       entra-emulator:
         condition: service_healthy
@@ -77,7 +92,7 @@ services:
       retries: 5
 
   arm-emulator:
-    image: ghcr.io/calvinchengx/arm-emulator:${ARM_EMULATOR_VERSION:-latest}
+    image: ghcr.io/calvinchengx/arm-emulator:${ARM_EMULATOR_VERSION:-0.1.1}
     depends_on:
       entra-emulator:
         condition: service_healthy
@@ -91,6 +106,7 @@ services:
       ARM_ENTRA_JWKS_URL: "https://entra-emulator:8443/6f89cf12-978b-4d23-ac18-9ef0c127cf87/discovery/v2.0/keys"
       ARM_ENTRA_TLS_INSECURE: "true"
       ARM_TENANT_ID: *tenant
+      ARM_SUBSCRIPTION_ID: *subscription
       ARM_DATA_DIR: "" # see STATE note above
     healthcheck:
       test: ["CMD", "/usr/local/bin/arm-emulator", "healthcheck"]
@@ -102,7 +118,7 @@ services:
   # never starts or pulls.
   fabric-emulator:
     profiles: [fabric]
-    image: ghcr.io/calvinchengx/fabric-emulator:${FABRIC_EMULATOR_VERSION:-latest}
+    image: ghcr.io/calvinchengx/fabric-emulator:${FABRIC_EMULATOR_VERSION:-0.18.0}
     depends_on:
       entra-emulator:
         condition: service_healthy
