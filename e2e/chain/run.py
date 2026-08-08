@@ -52,10 +52,10 @@ PORTS = {
 COMPOSE = ["docker", "compose", "-p", PROJECT, "-f", str(REPO / "docker-compose.yml")]
 ENV = {**os.environ, **PORTS}
 
-TENANT = "11111111-1111-1111-1111-111111111111"
-SUB = "00000000-0000-0000-0000-000000000001"
+TENANT = "6f89cf12-978b-4d23-ac18-9ef0c127cf87"
+SUB = "6082bfda-63d0-46f4-8272-ae9195139feb"
 # entra-emulator's seeded daemon app — a confidential client with a known secret.
-SP_CLIENT = "cccccccc-0000-0000-0000-000000000002"
+SP_CLIENT = "00d88624-f0d7-46f6-a641-6232c2608928"
 SP_SECRET = "daemon-app-secret"
 
 ENTRA = f"https://localhost:{PORTS['ENTRA_PORT']}"

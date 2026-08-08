@@ -40,7 +40,7 @@
 # binary runs as uid 65532, so a mounted volume fails with "unable to open
 # database file" until that image chowns /data as arm's and fabric's do.
 
-x-entra-tenant: &tenant "11111111-1111-1111-1111-111111111111"
+x-entra-tenant: &tenant "6f89cf12-978b-4d23-ac18-9ef0c127cf87"
 
 services:
   entra-emulator:
@@ -67,7 +67,7 @@ services:
       # Validate bearers against entra's JWKS; aud https://vault.azure.net is a
       # well-known Azure resource in entra-emulator v0.2.1+, so client
       # credentials resolve the vault audience with no resource-app seed step.
-      KV_ENTRA_ISSUER: "https://entra-emulator:8443/11111111-1111-1111-1111-111111111111/v2.0"
+      KV_ENTRA_ISSUER: "https://entra-emulator:8443/6f89cf12-978b-4d23-ac18-9ef0c127cf87/v2.0"
       KV_ENTRA_TLS_INSECURE: "true" # trust entra's self-signed cert on this network
       KV_DATA_DIR: "" # see STATE note above
     healthcheck:
@@ -87,8 +87,8 @@ services:
       # Same trust wiring as the others. ARM additionally evaluates RBAC role
       # assignments whose principalIds are entra's users/groups/SPs, so the two
       # must agree on the tenant — ARM_TENANT_ID already defaults to it.
-      ARM_ENTRA_ISSUER: "https://entra-emulator:8443/11111111-1111-1111-1111-111111111111/v2.0"
-      ARM_ENTRA_JWKS_URL: "https://entra-emulator:8443/11111111-1111-1111-1111-111111111111/discovery/v2.0/keys"
+      ARM_ENTRA_ISSUER: "https://entra-emulator:8443/6f89cf12-978b-4d23-ac18-9ef0c127cf87/v2.0"
+      ARM_ENTRA_JWKS_URL: "https://entra-emulator:8443/6f89cf12-978b-4d23-ac18-9ef0c127cf87/discovery/v2.0/keys"
       ARM_ENTRA_TLS_INSECURE: "true"
       ARM_TENANT_ID: *tenant
       ARM_DATA_DIR: "" # see STATE note above
@@ -113,7 +113,7 @@ services:
     ports:
       - "${FABRIC_PORT:-9443}:9443" # api.fabric + onelake.dfs + portal (host-routed)
     environment:
-      FABRIC_ENTRA_ISSUER: "https://entra-emulator:8443/11111111-1111-1111-1111-111111111111/v2.0"
-      FABRIC_ENTRA_JWKS_URL: "https://entra-emulator:8443/11111111-1111-1111-1111-111111111111/discovery/v2.0/keys"
+      FABRIC_ENTRA_ISSUER: "https://entra-emulator:8443/6f89cf12-978b-4d23-ac18-9ef0c127cf87/v2.0"
+      FABRIC_ENTRA_JWKS_URL: "https://entra-emulator:8443/6f89cf12-978b-4d23-ac18-9ef0c127cf87/discovery/v2.0/keys"
       FABRIC_ENTRA_TLS_INSECURE: "true"
       FABRIC_DATA_DIR: "" # see STATE note above
