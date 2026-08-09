@@ -133,3 +133,10 @@ services:
       FABRIC_ENTRA_JWKS_URL: "https://entra-emulator:8443/6f89cf12-978b-4d23-ac18-9ef0c127cf87/discovery/v2.0/keys"
       FABRIC_ENTRA_TLS_INSECURE: "true"
       FABRIC_DATA_DIR: "" # see STATE note above
+
+  # NEXT MEMBER (not yet composable): azure-apim-emulator — API Management,
+  # in development, no published image or remote yet. When it releases to
+  # GHCR, add it here as `${APIM_EMULATOR_VERSION:-<first release>}` behind an
+  # `apim` profile (it consumes entra + keyvault, so it sits with fabric on
+  # the consumer tier), extend e2e/chain/run.py with its leg, and add its
+  # release pins to scripts/check_family_pins.py.
