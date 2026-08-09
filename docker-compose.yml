@@ -108,7 +108,7 @@ services:
       retries: 5
 
   arm-emulator:
-    image: ghcr.io/calvinchengx/arm-emulator:${ARM_EMULATOR_VERSION:-0.2.0}
+    image: ghcr.io/calvinchengx/arm-emulator:${ARM_EMULATOR_VERSION:-0.3.1}
     depends_on:
       entra-emulator:
         condition: service_healthy
