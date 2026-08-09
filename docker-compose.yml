@@ -159,7 +159,7 @@ services:
   # never starts or pulls.
   fabric-emulator:
     profiles: [fabric]
-    image: ghcr.io/calvinchengx/fabric-emulator:${FABRIC_EMULATOR_VERSION:-0.19.0}
+    image: ghcr.io/calvinchengx/fabric-emulator:${FABRIC_EMULATOR_VERSION:-0.20.0}
     depends_on:
       entra-emulator:
         condition: service_healthy
@@ -173,6 +173,12 @@ services:
       FABRIC_ENTRA_ISSUER: "https://entra-emulator:8443/6f89cf12-978b-4d23-ac18-9ef0c127cf87/v2.0"
       FABRIC_ENTRA_JWKS_URL: "https://entra-emulator:8443/6f89cf12-978b-4d23-ac18-9ef0c127cf87/discovery/v2.0/keys"
       FABRIC_ENTRA_TLS_INSECURE: "true"
+      # REQUIRED since fabric 0.20.0 for AzureKeyVaultReference connections.
+      # Resolving one sends a vault-audience bearer token to the host the
+      # connection names, so fabric refuses any host not on its allowlist —
+      # Azure's own *.vault.azure.net, plus whatever this names. Without it a
+      # reference to the vault beside it here is refused at connection create.
+      FABRIC_AKV_VAULT_HOST: "keyvault-emulator:8444"
       FABRIC_DATA_DIR: "" # see STATE note above
 
   # API Management: management plane (ARM 2024-05-01), gateway, policies. A
