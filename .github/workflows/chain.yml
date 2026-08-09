@@ -41,7 +41,7 @@ jobs:
     runs-on: ubuntu-latest # Docker + compose preinstalled
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Validate the compose file
         run: |
           docker compose -f docker-compose.yml config >/dev/null
@@ -65,7 +65,7 @@ jobs:
       ARM_EMULATOR_VERSION: latest
       FABRIC_EMULATOR_VERSION: latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Run the chain (:latest)
         run: ./e2e/chain/run.py
       - name: Diagnose on failure
@@ -79,5 +79,5 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - run: ./scripts/check_family_pins.py
