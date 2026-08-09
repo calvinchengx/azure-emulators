@@ -10,6 +10,16 @@ docker compose up            # entra + keyvault + arm
 docker compose --profile fabric up   # …and fabric, the consumer
 ```
 
+ARM governs the vault, as it does in Azure: role assignments decide who may do
+what, and no assignment means no access. The stack seeds what the portal gives
+you when you create a vault — the resource, plus a grant for the principal that
+created it — so the quickstart works without hand-writing one. To go back to a
+vault that allows any authenticated caller:
+
+```sh
+KV_ARM_URL= docker compose up
+```
+
 ## The family
 
 Each emulator lives in its own repo and publishes its own image to GHCR on its
@@ -132,7 +142,10 @@ named for what it is.
 For the *semantics* of ARM→vault authorization (role assignments, access
 policies, revocation), see azure-keyvault-emulator's `e2e/arm-chain`, which
 covers that in depth from source. This repo deliberately tests the seam, not
-the semantics.
+the semantics — with one exception it has to make. The stack is ARM-governed,
+so `chain` asserts its data-plane probe is *authorized* (404) rather than
+merely authenticated (403). Without that, a broken seed would leave the whole
+stack denying by default and every test still green.
 
 ## Roadmap
 
