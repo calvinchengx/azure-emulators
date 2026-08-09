@@ -5,7 +5,8 @@ The BOM is docker-compose.yml's version defaults — `${X_VERSION:-N.N.N}` —
 which certify one combination of released images. But the
 family consumes entra (and arm) through more channels than the image: keyvault's
 e2e runners `go install` a pinned release, fabric's fab-driven example pins an
-image tag of its own, and three repos link entra as a go.mod library for their
+image tag of its own, contoso-data-platform pins the whole stack in a
+versions.env, and three repos link entra as a go.mod library for their
 in-process tests. A breaking upstream release has to land in ALL of them, and
 2026-08-08 showed what happens when it doesn't: keyvault was swept to a tenant
 no released entra seeded, and 12 CI jobs went red on an unrelated commit three
@@ -64,6 +65,10 @@ ENTRA_IMAGE = r"entra-emulator:\$\{ENTRA_EMULATOR_VERSION:-([\d.]+)\}"
 ARM_IMAGE = r"arm-emulator:\$\{ARM_EMULATOR_VERSION:-([\d.]+)\}"
 KEYVAULT_IMAGE = r"azure-keyvault-emulator:\$\{KEYVAULT_EMULATOR_VERSION:-([\d.]+)\}"
 FABRIC_IMAGE = r"fabric-emulator:\$\{FABRIC_EMULATOR_VERSION:-([\d.]+)\}"
+# A pin in an env file read by `docker compose --env-file`: `<VAR>=N.N.N`.
+ENTRA_ENV = r"^ENTRA_EMULATOR_VERSION=([\d.]+)"
+KEYVAULT_ENV = r"^KEYVAULT_EMULATOR_VERSION=([\d.]+)"
+FABRIC_ENV = r"^FABRIC_EMULATOR_VERSION=([\d.]+)"
 
 # Every fabric compose that stands an entra up. Listed rather than globbed
 # because this script reads the consumer over HTTP and cannot walk its tree; a
@@ -94,8 +99,15 @@ PINS = [
        r'"ARM_VERSION",\s*"(v[\d.]+)"', ARM, "error")
       for suite in ("az-cli", "arm-chain")],
     # fabric's fab-driven example pins entra's image the same way this repo does.
-    ("fabric-emulator", "examples/fab-driven/.env",
-     r'^ENTRA_EMULATOR_VERSION=([\d.]+)', ENTRA, "error"),
+    ("fabric-emulator", "examples/fab-driven/.env", ENTRA_ENV, ENTRA, "error"),
+    # contoso-data-platform is a CONSUMER, not a family member: it is what a
+    # reader writes from the published docs, and it runs the images rather than
+    # building them. That makes it the one place family drift shows up as a
+    # user would meet it — and until 2026-08-09 it was unwatched, which is how
+    # its keyvault pin sat three releases behind without anything saying so.
+    ("contoso-data-platform", "versions.env", KEYVAULT_ENV, KEYVAULT, "error"),
+    ("contoso-data-platform", "versions.env", ENTRA_ENV, ENTRA, "error"),
+    ("contoso-data-platform", "versions.env", FABRIC_ENV, FABRIC, "error"),
     # go.mod libraries: in-process entra for each repo's own tests.
     *[(repo, "go.mod",
        r'github\.com/calvinchengx/entra-emulator (v[\d.]+)', ENTRA, "warn")
@@ -125,7 +137,24 @@ PINS = [
 # in-flight work. Remove the entry the moment the condition is met.
 # (The founding example — fab-driven pinned 0.3.0 behind fabric's #113 revert —
 # retired 2026-08-09 when fabric #120 re-landed the migration.)
-WAIVERS = {}
+#
+# Keyed by (repo, path, pattern) rather than (repo, path): contoso pins three
+# images in ONE file, and two of them are blocked while the third is current.
+# A file-level key would have waived the keyvault pin along with them, which is
+# the pin that is actually enforceable today.
+WAIVERS = {
+    ("contoso-data-platform", "versions.env", ENTRA_ENV):
+        "entra 0.4.x moved the seeded tenant to 6f89cf12-… and dropped "
+        "11111111-…, which every issuer, JWKS and token URL in contoso's "
+        "compose names, under a client id 0.4.1 does not register either "
+        "(AADSTS90002 / AADSTS700016 against the released image). The bump is "
+        "that migration, not a pin edit. Retire when contoso lands it.",
+    ("contoso-data-platform", "versions.env", FABRIC_ENV):
+        "fabric moves in lockstep with SAIL_VERSION and SPARK_AGENT_VERSION "
+        "(contoso's scripts/set_release.py), and that bump is driven by "
+        "fabric's release workflow rather than by hand here. The 0.19.0 images "
+        "are published, so this is unblocked; retire once a release run lands.",
+}
 
 
 def fetch(url):
@@ -157,8 +186,8 @@ def main():
         for pin in found:
             if pin.lstrip("v") != want.lstrip("v"):
                 msg = f"{where}: pins {pin}, BOM says {want}"
-                if tier == "error" and (repo, path) in WAIVERS:
-                    warnings.append(f"{msg} [WAIVED: {WAIVERS[repo, path]}]")
+                if tier == "error" and (repo, path, pattern) in WAIVERS:
+                    warnings.append(f"{msg} [WAIVED: {WAIVERS[repo, path, pattern]}]")
                 elif tier == "error":
                     errors.append(msg)
                 else:
