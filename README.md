@@ -112,6 +112,22 @@ KEEP_UP=1 ./e2e/chain/run.py    # leave the stack up to poke at
 It runs under its own compose project on high ports (18443–18446), so it never
 collides with a family stack you already have running.
 
+## How much of Azure does the family emulate?
+
+Each emulator grades itself in its own `docs/parity.md` and binds every green
+row to a witness in `docs/witnesses.json`. To read all five at once:
+
+```sh
+./scripts/family_parity.py              # both tables, markdown
+./scripts/family_parity.py --evidence   # just what backs the green rows
+```
+
+It reads each repo's published main, and derives its counts using that repo's
+own checker rules, so a green count here is the number that repo's gate
+reports. The evidence table separates `ci:` (a packaged external client in CI)
+from `sdk:` (Microsoft's own client, in process) from our own tests, because
+only the first two are independent of our reading of the contract.
+
 ## Release coordination: the BOM
 
 The version defaults in [`docker-compose.yml`](docker-compose.yml) —
