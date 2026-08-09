@@ -1,0 +1,31 @@
+version: 2
+
+# This repo ships no emulator — no Go module, no image. Its dependency surface
+# is the docs site's pnpm workspace and the Actions that run the family gate.
+#
+# The emulator IMAGE versions are deliberately NOT managed here: they are the
+# BOM (docker-compose.yml's `${X_EMULATOR_VERSION:-N.N.N}` defaults), and a bump
+# is a family release decision the chain test certifies — not something a bot
+# should propose. The nightly drift job already reports when a newer upstream
+# release stops composing, which is the signal a Dependabot PR would duplicate
+# without the certification.
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # Starlight peers a specific Astro major, so they must move as a pair —
+      # majors included, or a fix landing only in the next Astro major is stuck.
+      docs-site:
+        patterns: ['astro', '@astrojs/*', 'sharp']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      actions:
+        patterns: ['*']

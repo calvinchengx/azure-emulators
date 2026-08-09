@@ -1,0 +1,61 @@
+# CodeQL — advanced (in-repo) setup, replacing the repo's Default setup.
+#
+# Scoped to FIRST-PARTY code only:
+#   - javascript-typescript the docs website
+#   - actions               these workflows
+#
+# No `go` here: this repo ships no emulator and has no Go module — the family
+# gate is Python and compose. That Python is two scripts run only by CI in this
+# repo; scanning it would add a language for ~300 lines of glue, so it is left
+# out deliberately rather than by oversight.
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '31 7 * * 1' # weekly, Monday 07:31 UTC (parity with Default setup)
+
+# Superseding a PR run is free money. Superseding a main run is not: a cancelled
+# CodeQL job still uploads its SARIF, flagged `unsuccessful execution` with zero
+# results, and that errored analysis becomes the newest one for its category —
+# which is exactly what the code-scanning tool status page reports. Landing a
+# burst of commits cancelled 11 of our first 43 main runs this way. So main runs
+# to completion; only PR pushes cancel.
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+    strategy:
+      fail-fast: false # one language's failure must not hide the others
+      matrix:
+        include:
+          - language: javascript-typescript
+            build-mode: none
+          - language: actions
+            build-mode: none
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4.37.6
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4.37.6
+        with:
+          category: '/language:${{ matrix.language }}'
