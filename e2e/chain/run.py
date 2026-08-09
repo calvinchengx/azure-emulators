@@ -20,7 +20,8 @@ So this test asserts the seam, not the semantics:
     3. arm ACCEPTS entra's token and performs a real write (resource group).
     4. keyvault ACCEPTS entra's token on a real data-plane call, and ARM's
        seeded grant reaches it — 404, not 403.
-    5. a token from the WRONG issuer is refused — proving step 3/4 passed
+    5. apim ACCEPTS the ARM-audience token on its own management surface.
+    6. a token from the WRONG issuer is refused — proving steps 3-5 passed
        because the trust chain holds, not because validation is absent.
 
 Stdlib-only, like the family's other e2e scripts.
