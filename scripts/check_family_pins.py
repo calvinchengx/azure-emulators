@@ -53,10 +53,37 @@ for var in ("ENTRA", "KEYVAULT", "ARM", "FABRIC"):
 
 ENTRA = BOM["ENTRA_EMULATOR_VERSION"]
 ARM = BOM["ARM_EMULATOR_VERSION"]
+KEYVAULT = BOM["KEYVAULT_EMULATOR_VERSION"]
+FABRIC = BOM["FABRIC_EMULATOR_VERSION"]
 
 # ------------------------------------------------------------- the sources --
 # (repo, path, regex, BOM version, tier). The regex's group(1) is the pin;
 # leading 'v' is normalized away before comparing.
+# A pinned family image: `ghcr.io/calvinchengx/<name>:${<VAR>:-N.N.N}`.
+ENTRA_IMAGE = r"entra-emulator:\$\{ENTRA_EMULATOR_VERSION:-([\d.]+)\}"
+KEYVAULT_IMAGE = r"azure-keyvault-emulator:\$\{KEYVAULT_EMULATOR_VERSION:-([\d.]+)\}"
+FABRIC_IMAGE = r"fabric-emulator:\$\{FABRIC_EMULATOR_VERSION:-([\d.]+)\}"
+
+# Every fabric compose that stands an entra up. Listed rather than globbed
+# because this script reads the consumer over HTTP and cannot walk its tree; a
+# NEW suite therefore has to be added here, and the "pin pattern not found"
+# error is what catches one of these being renamed or dropped.
+# examples/fab-driven is deliberately absent: its compose uses
+# ${ENTRA_EMULATOR_VERSION:?see .env}, so the pin lives in that .env, which is
+# already checked above. Checking both would double-report one pin.
+FABRIC_COMPOSES = (
+    "docker-compose.yml",
+    "e2e/notebook-run/docker-compose.jvm.yml",
+    *[f"e2e/{suite}/docker-compose.yml" for suite in (
+        "airflow", "azurite-shortcut", "data-science-loop", "dbt-fabric",
+        "dbt-fabricspark", "deployment-pipelines", "environment",
+        "external-shortcuts", "fabric-cli", "livy", "medallion",
+        "notebook-driven", "notebook-run", "rest-helix", "rest-servicenow",
+        "rti", "s3", "sail", "salesforce", "spark", "spark-jvm",
+        "vscode-extension",
+    )],
+)
+
 PINS = [
     # keyvault's e2e runners `go install` these releases and run them.
     *[("azure-keyvault-emulator", f"e2e/{suite}/run.py",
@@ -72,6 +99,18 @@ PINS = [
     *[(repo, "go.mod",
        r'github\.com/calvinchengx/entra-emulator (v[\d.]+)', ENTRA, "warn")
       for repo in ("arm-emulator", "azure-keyvault-emulator", "fabric-emulator")],
+    # Compose image tags. Until 2026-08-09 these were :latest, so an upstream
+    # release reached a consumer's CI the moment it published rather than when
+    # that repo chose to adopt it — the drift this repo's nightly job is meant
+    # to absorb centrally. They now carry the same ${X:-N.N.N} default this
+    # BOM does, which makes them checkable, so they are checked.
+    ("arm-emulator", "docker-compose.yml", ENTRA_IMAGE, ENTRA, "error"),
+    ("azure-keyvault-emulator", "docker-compose.yml", ENTRA_IMAGE, ENTRA, "error"),
+    ("azure-keyvault-emulator", "docker-compose.yml", FABRIC_IMAGE, FABRIC, "error"),
+    *[("fabric-emulator", path, ENTRA_IMAGE, ENTRA, "error")
+      for path in FABRIC_COMPOSES],
+    *[("fabric-emulator", path, KEYVAULT_IMAGE, KEYVAULT, "error")
+      for path in ("docker-compose.yml", "e2e/medallion/docker-compose.yml")],
 ]
 
 
