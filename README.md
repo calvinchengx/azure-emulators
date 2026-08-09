@@ -8,6 +8,7 @@ and *tested against each other*.
 ```sh
 docker compose up            # entra + keyvault + arm
 docker compose --profile fabric up   # …and fabric, the consumer
+docker compose --profile apim up     # …or apim, the other one
 ```
 
 ARM governs the vault, as it does in Azure: role assignments decide who may do
@@ -31,20 +32,21 @@ own release cadence. This repo pins and composes them.
 | `keyvault-emulator` | 8444 | [azure-keyvault-emulator](https://github.com/calvinchengx/azure-keyvault-emulator) | Key Vault data plane — secrets, keys, certificates |
 | `arm-emulator` | 8445 | [arm-emulator](https://github.com/calvinchengx/arm-emulator) | ARM control plane + `Microsoft.Authorization` RBAC |
 | `fabric-emulator` | 9443 | [fabric-emulator](https://github.com/calvinchengx/fabric-emulator) | Fabric control plane + OneLake. A **consumer** of the three above, so it sits behind a `fabric` profile |
+| `apim-emulator` | 8446 | [azure-apim-emulator](https://github.com/calvinchengx/azure-apim-emulator) | API Management — management plane, gateway, policies. A **consumer** too, behind an `apim` profile, but of entra alone: it serves its own `Microsoft.ApiManagement` ARM surface rather than calling arm |
 
 ## Why this repo exists
 
 **No single emulator's CI can verify the family.** entra's tests prove entra
 issues correct tokens; ARM's tests prove ARM validates *some* issuer. Neither
 proves that ARM validates *entra's* tokens, that the advertised issuer matches
-the one its peers check, or that the four images boot together in the right
+the one its peers check, or that the five images boot together in the right
 order. That cross-cutting proof has to live somewhere neutral — here.
 
 It also gives the family one canonical answer to "how do I run all of this?"
 that doesn't privilege any one repo, and one place to pin a known-good set of
 image versions.
 
-## Why four containers and not one
+## Why separate containers and not one
 
 Every emulator is a static Go binary on `distroless/static-debian12`, so the
 images share a base layer and each costs a few tens of MB of RSS. Bundling them
@@ -93,8 +95,11 @@ the seam:
 1. every service reports healthy;
 2. entra mints a token per audience (ARM, Key Vault);
 3. **arm accepts entra's token** and performs a real write (a resource group);
-4. **keyvault authenticates entra's token** on a real data-plane call;
-5. a **foreign-issuer token is refused** — so steps 3–4 passed because the trust
+4. **keyvault authorizes entra's token** on a real data-plane call — 404 and not
+   403, so ARM's seeded grant reached the vault rather than merely the token
+   being valid;
+5. **apim accepts the ARM-audience token** on its own management surface;
+6. a **foreign-issuer token is refused** — so steps 3–5 passed because the trust
    chain holds, not because validation is missing.
 
 ```sh
@@ -102,8 +107,8 @@ the seam:
 KEEP_UP=1 ./e2e/chain/run.py    # leave the stack up to poke at
 ```
 
-It runs under its own compose project on high ports (18443/18444/18445), so it
-never collides with a family stack you already have running.
+It runs under its own compose project on high ports (18443–18446), so it never
+collides with a family stack you already have running.
 
 ## Release coordination: the BOM
 
