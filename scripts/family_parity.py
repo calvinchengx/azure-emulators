@@ -146,6 +146,39 @@ def key_for(feature):
     return text.strip("-")
 
 
+def coverage(manifest, green_keys):
+    """How many green CLAIMS have independent evidence, not how many citations.
+
+    Citations were the first cut and they overstate breadth, because one claim
+    can carry several witnesses: keyvault shows 71 third-party citations across
+    48 claims, which reads like more than full coverage and is really 28 of
+    them. The question worth answering is what share of what an emulator claims
+    has been proved by something other than our own client, so each claim is
+    classified once, by its STRONGEST witness:
+
+      ci    a packaged external client in CI, over a network
+      sdk   Microsoft's own client, linked into a test in process
+      own   our client on both ends, which is our reading of the contract
+
+    Counted the other way round, entra's 14 citations looked like progress on a
+    51-claim ledger; 14 of 51 claims covered is the number that shows the gap.
+    """
+    tiers = {"ci": 0, "sdk": 0, "own": 0}
+    entries = manifest.get("claims", manifest) if isinstance(manifest, dict) else {}
+    for key, val in entries.items():
+        if key.startswith("_") or key.startswith("$") or key not in green_keys:
+            continue
+        witnesses = val.get("witnesses", []) if isinstance(val, dict) else val
+        kinds = {w.partition(":")[0] for w in witnesses if isinstance(witnesses, list)}
+        if "ci" in kinds:
+            tiers["ci"] += 1
+        elif "sdk" in kinds:
+            tiers["sdk"] += 1
+        else:
+            tiers["own"] += 1
+    return tiers
+
+
 def evidence(manifest, green_keys):
     """Witness citations by kind, counted ONLY over the green claims.
 
@@ -182,8 +215,9 @@ def collect(local=None):
         skip, heads = checker_rules(checker)
         grades, green_keys = (word_grades(parity) if short == "apim"
                               else emoji_grades(parity, skip, heads))
-        kinds = evidence(json.loads(raw_manifest), green_keys)
-        rows.append((short, grades, kinds))
+        manifest = json.loads(raw_manifest)
+        rows.append((short, grades, evidence(manifest, green_keys),
+                     coverage(manifest, green_keys)))
     return rows
 
 
@@ -191,7 +225,7 @@ def grades_table(rows):
     out = ["| emulator | green | partial | not implemented | total |",
            "|---|---:|---:|---:|---:|"]
     tot = {"green": 0, "amber": 0, "red": 0}
-    for short, g, _ in rows:
+    for short, g, _, _cov in rows:
         for k in tot:
             tot[k] += g[k]
         out.append(f"| {short} | {g['green']} | {g['amber']} | {g['red']} | "
@@ -202,14 +236,16 @@ def grades_table(rows):
 
 
 def evidence_table(rows):
-    out = ["| emulator | ci: external | sdk: Microsoft's client | own tests | "
-           "third-party | boundary |",
+    """Claims, classified once each by their strongest witness."""
+    out = ["| emulator | green claims | ci: external | sdk: only | own tests only | "
+           "independently evidenced |",
            "|---|---:|---:|---:|---:|---:|"]
-    for short, _, k in rows:
-        ci, sdk = k.get("ci", 0), k.get("sdk", 0)
-        own = k.get("go", 0) + k.get("py", 0)
-        out.append(f"| {short} | {ci} | {sdk} | {own} | **{ci + sdk}** | "
-                   f"{k.get('boundary', 0)} |")
+    for short, _, _k, cov in rows:
+        total = cov["ci"] + cov["sdk"] + cov["own"]
+        indep = cov["ci"] + cov["sdk"]
+        share = f"{indep}/{total}" + (f" ({round(100 * indep / total)}%)" if total else "")
+        out.append(f"| {short} | {total} | {cov['ci']} | {cov['sdk']} | "
+                   f"{cov['own']} | **{share}** |")
     return "\n".join(out)
 
 
@@ -232,8 +268,9 @@ def main(argv):
     if want_evidence:
         print("## Evidence behind the green rows\n")
         print(evidence_table(rows))
-        print("\nci: a packaged external client in CI. sdk: Microsoft's own client, "
-              "in process.\nown: our client, so our reading of the contract on both ends.")
+        print("\nEach claim is counted once, by its strongest witness. ci: a packaged "
+              "external\nclient in CI. sdk: Microsoft's own client, in process. own: our "
+              "client on both\nends, so our own reading of the contract.")
     return 0
 
 
