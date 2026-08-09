@@ -136,25 +136,21 @@ PINS = [
 # the point is to keep the gate honest without freezing another repo's
 # in-flight work. Remove the entry the moment the condition is met.
 # (The founding example — fab-driven pinned 0.3.0 behind fabric's #113 revert —
-# retired 2026-08-09 when fabric #120 re-landed the migration.)
+# retired 2026-08-09 when fabric #120 re-landed the migration. The second pair
+# — contoso's entra and fabric pins — retired the same day, and taught the
+# lesson below: BOTH were one blocker, not two. `fabric_target`, the wheel that
+# resolves the target, hardcodes the seeded tenant and client id, and it ships
+# with FABRIC_EMULATOR_VERSION. So entra could not move until fabric did, and
+# the entra waiver's stated reason — a compose migration — was the visible half
+# of a cause that lived in another repo's release artifact. A waiver naming the
+# wrong blocker is worse than a loud failure: it tells the next reader the work
+# is understood.)
 #
-# Keyed by (repo, path, pattern) rather than (repo, path): contoso pins three
-# images in ONE file, and two of them are blocked while the third is current.
-# A file-level key would have waived the keyvault pin along with them, which is
-# the pin that is actually enforceable today.
-WAIVERS = {
-    ("contoso-data-platform", "versions.env", ENTRA_ENV):
-        "entra 0.4.x moved the seeded tenant to 6f89cf12-… and dropped "
-        "11111111-…, which every issuer, JWKS and token URL in contoso's "
-        "compose names, under a client id 0.4.1 does not register either "
-        "(AADSTS90002 / AADSTS700016 against the released image). The bump is "
-        "that migration, not a pin edit. Retire when contoso lands it.",
-    ("contoso-data-platform", "versions.env", FABRIC_ENV):
-        "fabric moves in lockstep with SAIL_VERSION and SPARK_AGENT_VERSION "
-        "(contoso's scripts/set_release.py), and that bump is driven by "
-        "fabric's release workflow rather than by hand here. The 0.19.0 images "
-        "are published, so this is unblocked; retire once a release run lands.",
-}
+# Keyed by (repo, path, pattern) rather than (repo, path), which matters for any
+# consumer pinning several images in ONE file: a file-level key waives every pin
+# in that file, including the ones still enforceable. contoso was the case that
+# forced it — three pins, two blocked, one current.
+WAIVERS = {}
 
 
 def fetch(url):
