@@ -18,7 +18,8 @@ So this test asserts the seam, not the semantics:
     1. `docker compose up --wait` — every image reports healthy.
     2. entra mints a token per audience (ARM, Key Vault).
     3. arm ACCEPTS entra's token and performs a real write (resource group).
-    4. keyvault ACCEPTS entra's token on a real data-plane call.
+    4. keyvault ACCEPTS entra's token on a real data-plane call, and ARM's
+       seeded grant reaches it — 404, not 403.
     5. a token from the WRONG issuer is refused — proving step 3/4 passed
        because the trust chain holds, not because validation is absent.
 
@@ -157,16 +158,30 @@ def main():
             sys.exit(f"FAIL: arm rejected entra's token: {status} {raw[:300]}")
         step(3, f"arm accepted the token and created resourceGroups/{rg}")
 
-        # 4. Key Vault accepts entra's token on a real data-plane call. 200 or
-        #    403 both prove the token was VALIDATED (403 is an authorization
-        #    decision made after authentication); 401 means the trust chain is
-        #    broken, which is what we are here to catch.
-        status, raw = http(
-            "GET", f"{KV}/secrets/chain-probe?api-version={KV_API}", bearer(kv_tok)
-        )
-        if status == 401:
-            sys.exit(f"FAIL: keyvault refused entra's token (401): {raw[:300]}")
-        step(4, f"keyvault authenticated the token (HTTP {status})")
+        # 4. Key Vault accepts entra's token on a real data-plane call AND
+        #    ARM's grant reaches it. Three outcomes, all meaningful now that
+        #    the stack is governed:
+        #      401 — the trust chain is broken, the original point of this test.
+        #      403 — authenticated, then denied: arm-seed's role assignment
+        #            never landed. Until the BOM wired KV_ARM_URL this was an
+        #            accepted pass, which would have let a broken seed ship.
+        #      404 — authorized, and chain-probe does not exist. Success.
+        #    The vault POLLS ARM, so the grant is not visible the instant
+        #    arm-seed exits. Retry rather than race.
+        deadline = time.time() + 60
+        while True:
+            status, raw = http(
+                "GET", f"{KV}/secrets/chain-probe?api-version={KV_API}", bearer(kv_tok)
+            )
+            if status == 401:
+                sys.exit(f"FAIL: keyvault refused entra's token (401): {raw[:300]}")
+            if status != 403 or time.time() > deadline:
+                break
+            time.sleep(2)
+        if status == 403:
+            sys.exit("FAIL: keyvault authenticated the token but denied it (403) — "
+                     "arm-seed's grant never reached the vault")
+        step(4, f"keyvault authorized the token (HTTP {status})")
 
         # 5. A token from the wrong issuer must be refused — otherwise steps 3
         #    and 4 prove nothing about the trust chain.

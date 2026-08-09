@@ -76,6 +76,13 @@ services:
     depends_on:
       entra-emulator:
         condition: service_healthy
+      arm-emulator:
+        condition: service_healthy
+      # Not merely "arm is up" but "the grant exists". The vault polls ARM, so
+      # starting before the seed lands would leave a window where the stack is
+      # healthy and every data-plane call is a 403.
+      arm-seed:
+        condition: service_completed_successfully
     ports:
       - "${KEYVAULT_PORT:-8444}:8444" # Key Vault data plane
     environment:
@@ -84,6 +91,12 @@ services:
       # credentials resolve the vault audience with no resource-app seed step.
       KV_ENTRA_ISSUER: "https://entra-emulator:8443/6f89cf12-978b-4d23-ac18-9ef0c127cf87/v2.0"
       KV_ENTRA_TLS_INSECURE: "true" # trust entra's self-signed cert on this network
+      # ARM governs the vault: role assignments and the vault resource's own
+      # configuration decide who may do what, as in Azure. The `-` rather than
+      # `:-` is deliberate — an explicitly empty KV_ARM_URL opts out and
+      # restores the permissive stack, while unset gets the default.
+      KV_ARM_URL: "${KV_ARM_URL-https://arm-emulator:8445}"
+      KV_ARM_RESOURCE_GROUP: &resource_group "${KV_ARM_RESOURCE_GROUP:-emulator-rg}"
       KV_DATA_DIR: "" # see STATE note above
     healthcheck:
       test: ["CMD", "/usr/local/bin/azure-keyvault-emulator", "healthcheck"]
@@ -113,6 +126,31 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+
+  # Azure gives the principal that creates a vault a grant on it. ARM's rule is
+  # no-assignment-means-no-access, so without this the stack would stand up a
+  # vault that refuses its own quickstart. One shot, idempotent, and readable:
+  # scripts/seed-arm.py is the documentation for doing it by hand.
+  arm-seed:
+    image: python:3.12-alpine
+    restart: "no"
+    depends_on:
+      arm-emulator:
+        condition: service_healthy
+    environment:
+      SEED_ENTRA_URL: "https://entra-emulator:8443"
+      SEED_ARM_URL: "https://arm-emulator:8445"
+      SEED_TENANT_ID: *tenant
+      SEED_SUBSCRIPTION_ID: *subscription
+      SEED_RESOURCE_GROUP: *resource_group
+      SEED_VAULT_NAME: "${KV_DEFAULT_VAULT:-emulator}"
+      # entra's seeded daemon app, which is also the identity e2e/chain
+      # authenticates as — so the chain's probe proves this grant landed.
+      SEED_CLIENT_ID: "00d88624-f0d7-46f6-a641-6232c2608928"
+      SEED_CLIENT_SECRET: "daemon-app-secret"
+    volumes:
+      - ./scripts/seed-arm.py:/seed.py:ro
+    command: ["python3", "/seed.py"]
 
   # The consumer. Opt in with `--profile fabric`; without the flag this service
   # never starts or pulls.
