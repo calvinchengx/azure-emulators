@@ -210,38 +210,50 @@ def evidence(manifest, green_keys):
 
 
 def uncovered(manifest, green_keys):
-    """The green claims resting on our own client alone, which is the list a
-    maintainer can act on. The family table can only say how many; naming them
-    is the point of asking about one member."""
+    """The green claims resting on our own client alone, with what they DO have.
+
+    Names alone would say where the gaps are; carrying the existing witnesses
+    says what a new one would be added to, which is the difference between a
+    list and a work queue.
+    """
     out = []
     entries = manifest.get("claims", manifest) if isinstance(manifest, dict) else {}
     for key, val in entries.items():
         if key.startswith("_") or key.startswith("$") or key not in green_keys:
             continue
         witnesses = val.get("witnesses", []) if isinstance(val, dict) else val
-        kinds = {w.partition(":")[0] for w in witnesses if isinstance(witnesses, list)}
-        if not kinds & {"ci", "sdk"}:
-            out.append(key)
+        witnesses = witnesses if isinstance(witnesses, list) else []
+        if not {w.partition(":")[0] for w in witnesses} & {"ci", "sdk"}:
+            out.append((key, witnesses))
     return sorted(out)
 
 
 def member_report(short, grades, cov, gaps):
-    """One emulator, in the detail five rows cannot carry."""
+    """One emulator, in the same table shape as the family view."""
     total = cov["ci"] + cov["sdk"] + cov["own"]
     indep = cov["ci"] + cov["sdk"]
     pct = f" ({round(100 * indep / total)}%)" if total else ""
-    lines = [f"## {short}\n",
-             f"- **{grades['green']} green**, {grades['amber']} partial, "
-             f"{grades['red']} not implemented",
-             f"- **{indep}/{total}{pct} independently evidenced** — "
-             f"{cov['ci']} by a packaged external client, {cov['sdk']} by "
-             f"Microsoft's own client in process",
-             f"- {cov['own']} claims rest on our own client on both ends"]
+    lines = [
+        f"## {short}\n",
+        "| green | partial | not implemented | total |",
+        "|---:|---:|---:|---:|",
+        f"| {grades['green']} | {grades['amber']} | {grades['red']} | "
+        f"{grades['green'] + grades['amber'] + grades['red']} |",
+        "",
+        "| green claims | ci: external | sdk: only | own tests only | "
+        "independently evidenced |",
+        "|---:|---:|---:|---:|---:|",
+        f"| {total} | {cov['ci']} | {cov['sdk']} | {cov['own']} | "
+        f"**{indep}/{total}{pct}** |",
+    ]
     if gaps:
-        lines.append(f"\n### The {len(gaps)} claims with no third-party witness\n")
-        lines += [f"- `{g}`" for g in gaps]
+        lines += ["", f"### The {len(gaps)} claims with no third-party witness", "",
+                  "| claim | witnessed today by |", "|---|---|"]
+        for key, witnesses in gaps:
+            have = ", ".join(f"`{w}`" for w in witnesses) or "*nothing*"
+            lines.append(f"| `{key}` | {have} |")
     else:
-        lines.append("\nEvery green claim has a third-party witness.")
+        lines += ["", "Every green claim has a third-party witness."]
     return "\n".join(lines)
 
 
