@@ -95,6 +95,12 @@ PINS = [
     *[("azure-keyvault-emulator", f"e2e/{suite}/run.py",
        r'"ENTRA_VERSION",\s*"(v[\d.]+)"', ENTRA, "error")
       for suite in ("sdk", "chain", "az-cli", "arm-chain")],
+    # arm's az-cli witness does the same: on a CI runner there is no sibling
+    # checkout, so it `go install`s this entra release and the real Azure CLI
+    # authenticates against it. A stale pin here would quietly witness arm's
+    # parity claims against a retired entra.
+    ("arm-emulator", "e2e/az-cli/run.py",
+     r'"ENTRA_VERSION",\s*"(v[\d.]+)"', ENTRA, "error"),
     *[("azure-keyvault-emulator", f"e2e/{suite}/run.py",
        r'"ARM_VERSION",\s*"(v[\d.]+)"', ARM, "error")
       for suite in ("az-cli", "arm-chain")],
