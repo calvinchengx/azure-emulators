@@ -47,7 +47,7 @@ BOM = dict(re.findall(
     r"\$\{(\w+_EMULATOR_VERSION):-([\d.]+)\}",
     (ROOT / "docker-compose.yml").read_text(),
 ))
-for var in ("ENTRA", "KEYVAULT", "ARM", "FABRIC"):
+for var in ("ENTRA", "KEYVAULT", "ARM", "FABRIC", "APIM"):
     if f"{var}_EMULATOR_VERSION" not in BOM:
         sys.exit(f"docker-compose.yml has no ${{{var}_EMULATOR_VERSION:-…}} default — "
                  "the BOM must pin every service (never :latest)")

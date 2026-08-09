@@ -49,8 +49,12 @@ PORTS = {
     "ENTRA_PORT": os.environ.get("ENTRA_PORT", "18443"),
     "KEYVAULT_PORT": os.environ.get("KEYVAULT_PORT", "18444"),
     "ARM_PORT": os.environ.get("ARM_PORT", "18445"),
+    "APIM_PORT": os.environ.get("APIM_PORT", "18446"),
 }
-COMPOSE = ["docker", "compose", "-p", PROJECT, "-f", str(REPO / "docker-compose.yml")]
+# --profile apim: the chain certifies the profiled consumer too — its ARM
+# surface must accept entra's token the same way arm's does.
+COMPOSE = ["docker", "compose", "-p", PROJECT, "--profile", "apim",
+           "-f", str(REPO / "docker-compose.yml")]
 ENV = {**os.environ, **PORTS}
 
 TENANT = "6f89cf12-978b-4d23-ac18-9ef0c127cf87"
@@ -62,7 +66,9 @@ SP_SECRET = "daemon-app-secret"
 ENTRA = f"https://localhost:{PORTS['ENTRA_PORT']}"
 KV = f"https://localhost:{PORTS['KEYVAULT_PORT']}"
 ARM = f"https://localhost:{PORTS['ARM_PORT']}"
+APIM = f"https://localhost:{PORTS['APIM_PORT']}"
 ARM_API = "2021-04-01"
+APIM_API = "2024-05-01"
 KV_API = "7.5"
 
 # Self-signed certs on every service; this is a local emulator stack.
@@ -183,8 +189,21 @@ def main():
                      "arm-seed's grant never reached the vault")
         step(4, f"keyvault authorized the token (HTTP {status})")
 
-        # 5. A token from the wrong issuer must be refused — otherwise steps 3
-        #    and 4 prove nothing about the trust chain.
+        # 5. apim accepts the same ARM-audience token on its management
+        #    surface. The seam, not the semantics: any non-401 means the
+        #    trust chain held; apim's own suites cover what the routes do.
+        status, raw = http(
+            "GET",
+            f"{APIM}/subscriptions/{SUB}/providers/Microsoft.ApiManagement/service"
+            f"?api-version={APIM_API}",
+            bearer(arm_tok),
+        )
+        if status == 401:
+            sys.exit(f"FAIL: apim refused entra's token (401): {raw[:300]}")
+        step(5, f"apim accepted the ARM-audience token (HTTP {status})")
+
+        # 6. A token from the wrong issuer must be refused — otherwise steps
+        #    3-5 prove nothing about the trust chain.
         bogus = (
             "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9."
             "eyJpc3MiOiJodHRwczovL2V2aWwuZXhhbXBsZS8iLCJhdWQiOiJodHRwczovL21hbmFnZW1lbnQuYXp1cmUuY29tIn0."
@@ -197,7 +216,15 @@ def main():
         )
         if status != 401:
             sys.exit(f"FAIL: arm accepted a foreign-issuer token (HTTP {status})")
-        step(5, "arm rejected a foreign-issuer token (401) — the gate is real")
+        status, _ = http(
+            "GET",
+            f"{APIM}/subscriptions/{SUB}/providers/Microsoft.ApiManagement/service"
+            f"?api-version={APIM_API}",
+            bearer(bogus),
+        )
+        if status != 401:
+            sys.exit(f"FAIL: apim accepted a foreign-issuer token (HTTP {status})")
+        step(6, "arm and apim rejected a foreign-issuer token (401) — the gate is real")
 
     finally:
         if keep:
