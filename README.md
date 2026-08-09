@@ -126,6 +126,14 @@ It reads each repo's published main, and derives its counts using that repo's
 own checker rules, so a green count here is the number that repo's gate
 reports.
 
+`reached` is green over the ledger's own total: progress against **declared
+scope**. The denominator is what that emulator set out to reach parity with,
+gaps included, since a 🔴 row is an enumerated absence rather than a silence,
+and each ledger says separately under `## Scope boundary` what it leaves out
+and why. It moves when discovery adds rows, which is the design. What it cannot
+see is surface nobody has enumerated yet; that denominator would have to come
+from Microsoft's published specs, and no repo computes it today.
+
 The evidence table counts **claims, not citations**, and classifies each claim
 once by its strongest witness: `ci:` a packaged external client in CI, `sdk:`
 Microsoft's own client linked in process, otherwise our own client on both ends

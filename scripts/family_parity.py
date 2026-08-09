@@ -222,16 +222,32 @@ def collect(local=None):
 
 
 def grades_table(rows):
-    out = ["| emulator | green | partial | not implemented | total |",
-           "|---|---:|---:|---:|---:|"]
+    """Green over the ledger's own total: progress against DECLARED scope.
+
+    The denominator is what the repo set out to reach parity with, gaps
+    included — a 🔴 row is an enumerated absence, not a silence — and each
+    ledger states separately, under `## Scope boundary`, what it deliberately
+    leaves out and why. So this share is honest about intent, and it moves when
+    discovery adds rows, which is the design rather than a defect.
+
+    What it cannot see is surface nobody has enumerated yet. For that the
+    denominator has to come from Microsoft's published specs, which is a
+    different and harsher number this script does not compute.
+    """
+    out = ["| emulator | green | partial | not implemented | total | reached |",
+           "|---|---:|---:|---:|---:|---:|"]
     tot = {"green": 0, "amber": 0, "red": 0}
     for short, g, _, _cov in rows:
         for k in tot:
             tot[k] += g[k]
-        out.append(f"| {short} | {g['green']} | {g['amber']} | {g['red']} | "
-                   f"{g['green'] + g['amber'] + g['red']} |")
+        n = g["green"] + g["amber"] + g["red"]
+        share = f"{round(100 * g['green'] / n)}%" if n else "-"
+        out.append(f"| {short} | {g['green']} | {g['amber']} | {g['red']} | {n} | "
+                   f"**{share}** |")
+    grand = sum(tot.values())
     out.append(f"| **family** | **{tot['green']}** | **{tot['amber']}** | "
-               f"**{tot['red']}** | **{sum(tot.values())}** |")
+               f"**{tot['red']}** | **{grand}** | "
+               f"**{round(100 * tot['green'] / grand)}%** |")
     return "\n".join(out)
 
 
