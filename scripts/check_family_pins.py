@@ -79,11 +79,9 @@ PINS = [
 # reason and the condition that retires it. A waiver is visible in every run —
 # the point is to keep the gate honest without freezing another repo's
 # in-flight work. Remove the entry the moment the condition is met.
-WAIVERS = {
-    ("fabric-emulator", "examples/fab-driven/.env"):
-        "fabric #113 reverted the 0.4.0 pin while entra v0.4.0 was unreleased; "
-        "retire this waiver when fabric re-lands #108/#109 (v0.4.0 shipped 2026-08-08)",
-}
+# (The founding example — fab-driven pinned 0.3.0 behind fabric's #113 revert —
+# retired 2026-08-09 when fabric #120 re-landed the migration.)
+WAIVERS = {}
 
 
 def fetch(url):
