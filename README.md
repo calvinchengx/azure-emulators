@@ -1,5 +1,7 @@
 # azure-emulators
 
+**📖 [calvinchengx.github.io/azure-emulators](https://calvinchengx.github.io/azure-emulators/)** — quickstart, the family, release coordination, and what the chain test proves.
+
 The Azure emulator family, composed. **This repo runs no emulator of its own** —
 it ships no binary, no image, and no Go module. It is the neutral place where
 the independently-released emulators are wired together, documented as a family,

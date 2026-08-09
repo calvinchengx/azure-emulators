@@ -1,0 +1,14 @@
+{
+  "name": "azure-emulators-workspace",
+  "private": true,
+  "packageManager": "pnpm@10.29.3",
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=10"
+  },
+  "scripts": {
+    "preinstall": "npx only-allow pnpm",
+    "docs:dev": "pnpm --filter azure-emulators-docs dev",
+    "docs:build": "pnpm --filter azure-emulators-docs build"
+  }
+}
