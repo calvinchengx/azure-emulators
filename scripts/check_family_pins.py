@@ -108,10 +108,16 @@ PINS = [
     ("contoso-data-platform", "versions.env", KEYVAULT_ENV, KEYVAULT, "error"),
     ("contoso-data-platform", "versions.env", ENTRA_ENV, ENTRA, "error"),
     ("contoso-data-platform", "versions.env", FABRIC_ENV, FABRIC, "error"),
-    # go.mod libraries: in-process entra for each repo's own tests.
+    # go.mod libraries: in-process entra for each repo's own tests. apim joins
+    # here and NOT above: it publishes an image this BOM pins, but it consumes
+    # no family image itself — it serves its own Microsoft.ApiManagement ARM
+    # surface rather than calling arm, and its Key Vault support is modelled
+    # references, not calls. entra is its one real dependency, and go.mod is
+    # where that dependency is pinned.
     *[(repo, "go.mod",
        r'github\.com/calvinchengx/entra-emulator (v[\d.]+)', ENTRA, "warn")
-      for repo in ("arm-emulator", "azure-keyvault-emulator", "fabric-emulator")],
+      for repo in ("arm-emulator", "azure-keyvault-emulator", "fabric-emulator",
+                   "azure-apim-emulator")],
     # Compose image tags. Until 2026-08-09 these were :latest, so an upstream
     # release reached a consumer's CI the moment it published rather than when
     # that repo chose to adopt it — the drift this repo's nightly job is meant

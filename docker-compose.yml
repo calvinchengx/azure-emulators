@@ -47,9 +47,12 @@
 # and writes to that throwaway layer.) To persist, drop the override and add a
 # volume, e.g.:
 #   volumes: ["kv-data:/data"]   (plus a top-level `volumes: kv-data:`)
-# NOTE: keyvault's image cannot yet do this — its /data is root-owned while the
-# binary runs as uid 65532, so a mounted volume fails with "unable to open
-# database file" until that image chowns /data as arm's and fabric's do.
+# This works for every service here. It once did not for keyvault, whose /data
+# was root-owned while the binary ran as uid 65532, and this file carried a note
+# saying so. That note outlived the defect: keyvault's Dockerfile chowns /data
+# exactly as arm's and fabric's do, and 0.6.0 on a named volume writes its
+# SQLite DB and TLS material as 65532. Telling a reader persistence is
+# impossible when it works costs more than saying nothing.
 
 x-entra-tenant: &tenant "6f89cf12-978b-4d23-ac18-9ef0c127cf87"
 # The subscription every ARM resource lives under. Stated here rather than
