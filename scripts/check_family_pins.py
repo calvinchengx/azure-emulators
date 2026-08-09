@@ -61,6 +61,7 @@ FABRIC = BOM["FABRIC_EMULATOR_VERSION"]
 # leading 'v' is normalized away before comparing.
 # A pinned family image: `ghcr.io/calvinchengx/<name>:${<VAR>:-N.N.N}`.
 ENTRA_IMAGE = r"entra-emulator:\$\{ENTRA_EMULATOR_VERSION:-([\d.]+)\}"
+ARM_IMAGE = r"arm-emulator:\$\{ARM_EMULATOR_VERSION:-([\d.]+)\}"
 KEYVAULT_IMAGE = r"azure-keyvault-emulator:\$\{KEYVAULT_EMULATOR_VERSION:-([\d.]+)\}"
 FABRIC_IMAGE = r"fabric-emulator:\$\{FABRIC_EMULATOR_VERSION:-([\d.]+)\}"
 
@@ -107,6 +108,10 @@ PINS = [
     ("arm-emulator", "docker-compose.yml", ENTRA_IMAGE, ENTRA, "error"),
     ("azure-keyvault-emulator", "docker-compose.yml", ENTRA_IMAGE, ENTRA, "error"),
     ("azure-keyvault-emulator", "docker-compose.yml", FABRIC_IMAGE, FABRIC, "error"),
+    # keyvault v0.6.0 stands arm up in its base compose, so that stack now
+    # certifies an arm version too. It went in as ARM_IMAGE_TAG and was
+    # therefore invisible here; renamed in keyvault #19 so it is checkable.
+    ("azure-keyvault-emulator", "docker-compose.yml", ARM_IMAGE, ARM, "error"),
     *[("fabric-emulator", path, ENTRA_IMAGE, ENTRA, "error")
       for path in FABRIC_COMPOSES],
     *[("fabric-emulator", path, KEYVAULT_IMAGE, KEYVAULT, "error")
