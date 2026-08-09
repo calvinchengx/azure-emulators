@@ -124,9 +124,15 @@ row to a witness in `docs/witnesses.json`. To read all five at once:
 
 It reads each repo's published main, and derives its counts using that repo's
 own checker rules, so a green count here is the number that repo's gate
-reports. The evidence table separates `ci:` (a packaged external client in CI)
-from `sdk:` (Microsoft's own client, in process) from our own tests, because
-only the first two are independent of our reading of the contract.
+reports.
+
+The evidence table counts **claims, not citations**, and classifies each claim
+once by its strongest witness: `ci:` a packaged external client in CI, `sdk:`
+Microsoft's own client linked in process, otherwise our own client on both ends
+of the wire. Citations were the first cut and they flatter: one claim can carry
+several witnesses, so keyvault's 71 third-party citations spread across only 28
+of its 48 claims. The share at the end is the honest headline — how much of
+what an emulator claims has been proved by something that is not us.
 
 ## Release coordination: the BOM
 
