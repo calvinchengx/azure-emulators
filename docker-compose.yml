@@ -39,13 +39,22 @@
 # finish AND the GHCR image must exist; the Go module proxy can carry a new
 # version for many minutes while :latest is still the previous image.
 #
-# NO STATE SURVIVES HERE. Nothing mounts a volume, so nothing outlives
-# `docker compose down`. Every image bakes <PREFIX>_DATA_DIR=/data for callers
+# NO STATE SURVIVES HERE. Every image bakes <PREFIX>_DATA_DIR=/data for callers
 # who DO mount one; the services below pin it back to "" so they run fully
-# in-memory instead of accumulating a SQLite file in a container layer that is
-# about to be thrown away. (entra is the exception: it keeps its baked DB_PATH
-# and writes to that throwaway layer.) To persist, drop the override and add a
-# volume, e.g.:
+# in-memory instead of accumulating a SQLite file that is about to be thrown
+# away. Note "thrown away" is not the same as "never written": entra's
+# Dockerfile declares VOLUME ["/app/data"], so Docker mounts an ANONYMOUS
+# volume whether or not this file asks for one. Which cycle you run decides
+# whether that volume is fresh, and the two differ:
+#   down + up      new container, NEW volume, nothing carries over. The old
+#                  volume is orphaned rather than removed, so they pile up
+#                  until `down -v` or a prune.
+#   stop/start,    SAME container, so the same volume and everything in it.
+#   restart        Measured: identical volume id and identical cert.pem.
+# So "restarting is clean" is false. The in-memory pins below are what stop
+# anything being written into that volume in the first place, bar entra's
+# throwaway TLS pair, which is load-bearing for its healthcheck.
+# To persist deliberately, drop the override and add a named volume, e.g.:
 #   volumes: ["kv-data:/data"]   (plus a top-level `volumes: kv-data:`)
 # This works for every service here. It once did not for keyvault, whose /data
 # was root-owned while the binary ran as uid 65532, and this file carried a note
@@ -62,10 +71,24 @@ x-arm-subscription: &subscription "6082bfda-63d0-46f4-8272-ae9195139feb"
 
 services:
   entra-emulator:
-    image: ghcr.io/calvinchengx/entra-emulator:${ENTRA_EMULATOR_VERSION:-0.4.1}
+    image: ghcr.io/calvinchengx/entra-emulator:${ENTRA_EMULATOR_VERSION:-0.6.0}
     environment:
       ORIGIN_MODE: compat # single origin, path-prefixed surfaces
       PUBLIC_ORIGIN: "https://entra-emulator:8443"
+      # Two, not one (see STATE note above). ENTRA_DATA_DIR only supplies the
+      # DEFAULT for DB_PATH and TLS_CERT_DIR, and entra's image bakes both, so
+      # on its own it is a no-op in a container: measured against the 0.6.0
+      # image, ENTRA_DATA_DIR alone left db+wal+shm+tls in the volume, exactly
+      # as with no override at all.
+      ENTRA_DATA_DIR: ""
+      DB_PATH: "" # baked /app/data/entra-emulator.db, else it wins
+      # TLS_CERT_DIR is deliberately NOT pinned to "". It would work, and the
+      # volume comes out empty, but the cert then lives only in memory, and
+      # `entra-emulator healthcheck` verifies the chain against the cert dir on
+      # disk. With no dir it fails x509 "unknown authority" forever while the
+      # server is serving perfectly (JWKS answers fine). Every service below
+      # waits on `condition: service_healthy`, so pinning it deadlocks the
+      # whole stack on a healthy emulator. The stray tls/ pair is the price.
     ports:
       - "${ENTRA_PORT:-8443}:8443" # login / graph / scim / discovery (JWKS)
     healthcheck:
