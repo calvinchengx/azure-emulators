@@ -29,6 +29,12 @@ Stdlib only, like the family's other scripts.
     ./scripts/family_parity.py --grades     just the parity grades
     ./scripts/family_parity.py --evidence   just the evidence behind the greens
     ./scripts/family_parity.py --local ..   read sibling checkouts instead of main
+    ./scripts/family_parity.py entra        one member, in detail
+
+A member name switches to a report the five-row table cannot carry: the same
+counts, plus every green claim that rests on our own client alone, by name.
+That list is the actionable part — "37 uncovered" tells a maintainer nothing
+about where to start, and the names do.
 """
 
 import ast
@@ -203,9 +209,59 @@ def evidence(manifest, green_keys):
     return kinds
 
 
-def collect(local=None):
+def uncovered(manifest, green_keys):
+    """The green claims resting on our own client alone, with what they DO have.
+
+    Names alone would say where the gaps are; carrying the existing witnesses
+    says what a new one would be added to, which is the difference between a
+    list and a work queue.
+    """
+    out = []
+    entries = manifest.get("claims", manifest) if isinstance(manifest, dict) else {}
+    for key, val in entries.items():
+        if key.startswith("_") or key.startswith("$") or key not in green_keys:
+            continue
+        witnesses = val.get("witnesses", []) if isinstance(val, dict) else val
+        witnesses = witnesses if isinstance(witnesses, list) else []
+        if not {w.partition(":")[0] for w in witnesses} & {"ci", "sdk"}:
+            out.append((key, witnesses))
+    return sorted(out)
+
+
+def member_report(short, grades, cov, gaps):
+    """One emulator, in the same table shape as the family view."""
+    total = cov["ci"] + cov["sdk"] + cov["own"]
+    indep = cov["ci"] + cov["sdk"]
+    pct = f" ({round(100 * indep / total)}%)" if total else ""
+    lines = [
+        f"## {short}\n",
+        "| green | partial | not implemented | total |",
+        "|---:|---:|---:|---:|",
+        f"| {grades['green']} | {grades['amber']} | {grades['red']} | "
+        f"{grades['green'] + grades['amber'] + grades['red']} |",
+        "",
+        "| green claims | ci: external | sdk: only | own tests only | "
+        "independently evidenced |",
+        "|---:|---:|---:|---:|---:|",
+        f"| {total} | {cov['ci']} | {cov['sdk']} | {cov['own']} | "
+        f"**{indep}/{total}{pct}** |",
+    ]
+    if gaps:
+        lines += ["", f"### The {len(gaps)} claims with no third-party witness", "",
+                  "| claim | witnessed today by |", "|---|---|"]
+        for key, witnesses in gaps:
+            have = ", ".join(f"`{w}`" for w in witnesses) or "*nothing*"
+            lines.append(f"| `{key}` | {have} |")
+    else:
+        lines += ["", "Every green claim has a third-party witness."]
+    return "\n".join(lines)
+
+
+def collect(local=None, only=None):
     rows = []
     for repo, short in REPOS:
+        if only and only not in (short, repo):
+            continue
         parity = fetch(repo, "docs/parity.md", local)
         raw_manifest = fetch(repo, "docs/witnesses.json", local)
         checker = fetch(repo, "scripts/check_witnesses.py", local)
@@ -217,7 +273,8 @@ def collect(local=None):
                               else emoji_grades(parity, skip, heads))
         manifest = json.loads(raw_manifest)
         rows.append((short, grades, evidence(manifest, green_keys),
-                     coverage(manifest, green_keys)))
+                     coverage(manifest, green_keys),
+                     uncovered(manifest, green_keys)))
     return rows
 
 
@@ -237,7 +294,7 @@ def grades_table(rows):
     out = ["| emulator | green | partial | not implemented | total | reached |",
            "|---|---:|---:|---:|---:|---:|"]
     tot = {"green": 0, "amber": 0, "red": 0}
-    for short, g, _, _cov in rows:
+    for short, g, _, _cov, _gaps in rows:
         for k in tot:
             tot[k] += g[k]
         n = g["green"] + g["amber"] + g["red"]
@@ -256,7 +313,7 @@ def evidence_table(rows):
     out = ["| emulator | green claims | ci: external | sdk: only | own tests only | "
            "independently evidenced |",
            "|---|---:|---:|---:|---:|---:|"]
-    for short, _, _k, cov in rows:
+    for short, _, _k, cov, _gaps in rows:
         total = cov["ci"] + cov["sdk"] + cov["own"]
         indep = cov["ci"] + cov["sdk"]
         share = f"{indep}/{total}" + (f" ({round(100 * indep / total)}%)" if total else "")
@@ -270,10 +327,25 @@ def main(argv):
     if "--local" in argv:
         i = argv.index("--local")
         local = argv[i + 1] if i + 1 < len(argv) else ".."
-    rows = collect(local)
+    # A bare word is a member name: `family_parity.py entra`. Accepts the short
+    # name or the repo name, so both `arm` and `arm-emulator` work.
+    known = {s for _, s in REPOS} | {r for r, _ in REPOS}
+    only = next((a for a in argv if not a.startswith("-") and a in known), None)
+    stray = [a for a in argv if not a.startswith("-") and a not in known
+             and a != local]
+    if stray:
+        print(f"unknown member {stray[0]!r}. Known: "
+              + ", ".join(sorted(s for _, s in REPOS)))
+        return 2
+    rows = collect(local, only)
     if not rows:
         print("FAIL: no ledger could be read — network, or a repo moved its docs.")
         return 1
+
+    if only:
+        short, grades, _kinds, cov, gaps = rows[0]
+        print(member_report(short, grades, cov, gaps))
+        return 0
     want_grades = "--evidence" not in argv
     want_evidence = "--grades" not in argv
     if want_grades:
