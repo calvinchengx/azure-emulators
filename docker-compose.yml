@@ -39,29 +39,35 @@
 # finish AND the GHCR image must exist; the Go module proxy can carry a new
 # version for many minutes while :latest is still the previous image.
 #
-# NO STATE SURVIVES HERE. Every image bakes <PREFIX>_DATA_DIR=/data for callers
-# who DO mount one; the services below pin it back to "" so they run fully
-# in-memory instead of accumulating a SQLite file that is about to be thrown
-# away. Note "thrown away" is not the same as "never written": entra's
-# Dockerfile declares VOLUME ["/app/data"], so Docker mounts an ANONYMOUS
-# volume whether or not this file asks for one. Which cycle you run decides
-# whether that volume is fresh, and the two differ:
-#   down + up      new container, NEW volume, nothing carries over. The old
-#                  volume is orphaned rather than removed, so they pile up
-#                  until `down -v` or a prune.
-#   stop/start,    SAME container, so the same volume and everything in it.
-#   restart        Measured: identical volume id and identical cert.pem.
-# So "restarting is clean" is false. The in-memory pins below are what stop
-# anything being written into that volume in the first place, bar entra's
-# throwaway TLS pair, which is load-bearing for its healthcheck.
-# To persist deliberately, drop the override and add a named volume, e.g.:
-#   volumes: ["kv-data:/data"]   (plus a top-level `volumes: kv-data:`)
-# This works for every service here. It once did not for keyvault, whose /data
-# was root-owned while the binary ran as uid 65532, and this file carried a note
-# saying so. That note outlived the defect: keyvault's Dockerfile chowns /data
-# exactly as arm's and fabric's do, and 0.6.0 on a named volume writes its
-# SQLite DB and TLS material as 65532. Telling a reader persistence is
-# impossible when it works costs more than saying nothing.
+# STATE PERSISTS HERE, on purpose. Every service below writes its SQLite
+# database to a NAMED volume, so a directory you seed once is still there
+# tomorrow. Each image already bakes <PREFIX>_DATA_DIR=/data; this file mounts
+# a volume there rather than pinning the variable back to "".
+#
+#   up / down / up   state survives. The named volume outlives the container.
+#   stop/start,      same container, same volume, obviously survives.
+#   restart
+#   down -v          THE reset. Removes the volumes; next `up` is a fresh
+#                    directory, a fresh vault, a fresh everything.
+#
+# So wiping is now the deliberate act, and `down` alone no longer does it.
+#
+# To go back to throwaway, set the variable to empty — explicitly empty means
+# in-memory, and the `-` rather than `:-` below is what makes that reachable:
+#   KV_DATA_DIR= docker compose up
+# e2e/chain/run.py does exactly that, because a test that inherits yesterday's
+# state is not testing what it claims to.
+#
+# Volume ownership was once a real obstacle here and no longer is: keyvault's
+# /data was root-owned while the binary ran as uid 65532, and this file carried
+# a note saying persistence was impossible for it. keyvault's Dockerfile chowns
+# /data exactly as arm's and fabric's do, and it writes its SQLite DB and TLS
+# material as 65532 on a named volume. The note outlived the defect.
+#
+# entra needs TWO settings, not one. ENTRA_DATA_DIR only supplies the DEFAULT
+# for DB_PATH and TLS_CERT_DIR, and entra's image bakes both, so on its own it
+# is a no-op in a container — measured against the 0.6.0 image. Both are
+# threaded below.
 
 x-entra-tenant: &tenant "6f89cf12-978b-4d23-ac18-9ef0c127cf87"
 # The subscription every ARM resource lives under. Stated here rather than
@@ -76,21 +82,22 @@ services:
       ORIGIN_MODE: compat # single origin, path-prefixed surfaces
       PUBLIC_ORIGIN: "https://entra-emulator:8443"
       # Two, not one (see STATE note above). ENTRA_DATA_DIR only supplies the
-      # DEFAULT for DB_PATH and TLS_CERT_DIR, and entra's image bakes both, so
-      # on its own it is a no-op in a container: measured against the 0.6.0
-      # image, ENTRA_DATA_DIR alone left db+wal+shm+tls in the volume, exactly
-      # as with no override at all.
-      ENTRA_DATA_DIR: ""
-      DB_PATH: "" # baked /app/data/entra-emulator.db, else it wins
-      # TLS_CERT_DIR is deliberately NOT pinned to "". It would work, and the
-      # volume comes out empty, but the cert then lives only in memory, and
-      # `entra-emulator healthcheck` verifies the chain against the cert dir on
-      # disk. With no dir it fails x509 "unknown authority" forever while the
-      # server is serving perfectly (JWKS answers fine). Every service below
-      # waits on `condition: service_healthy`, so pinning it deadlocks the
-      # whole stack on a healthy emulator. The stray tls/ pair is the price.
+      # DEFAULT for DB_PATH, and entra's image bakes that, so the directory
+      # alone is a no-op in a container. Both carry the same `-` default, so
+      # `ENTRA_DATA_DIR= DB_PATH= docker compose up` still gets you in-memory.
+      ENTRA_DATA_DIR: "${ENTRA_DATA_DIR-/app/data}"
+      DB_PATH: "${DB_PATH-/app/data/entra-emulator.db}"
+      # TLS_CERT_DIR is deliberately left alone. Pinning it empty would work,
+      # but the cert would then live only in memory, and `entra-emulator
+      # healthcheck` verifies the chain against the cert dir ON DISK. With no
+      # dir it fails x509 "unknown authority" forever while the server serves
+      # perfectly (JWKS answers fine). Every service below waits on
+      # `condition: service_healthy`, so pinning it deadlocks the whole stack
+      # on a healthy emulator.
     ports:
       - "${ENTRA_PORT:-8443}:8443" # login / graph / scim / discovery (JWKS)
+    volumes:
+      - entra-data:/app/data
     healthcheck:
       test: ["CMD", "/usr/local/bin/entra-emulator", "healthcheck"]
       interval: 5s
@@ -123,7 +130,9 @@ services:
       # restores the permissive stack, while unset gets the default.
       KV_ARM_URL: "${KV_ARM_URL-https://arm-emulator:8445}"
       KV_ARM_RESOURCE_GROUP: &resource_group "${KV_ARM_RESOURCE_GROUP:-emulator-rg}"
-      KV_DATA_DIR: "" # see STATE note above
+      KV_DATA_DIR: "${KV_DATA_DIR-/data}" # see STATE note above
+    volumes:
+      - keyvault-data:/data
     healthcheck:
       test: ["CMD", "/usr/local/bin/azure-keyvault-emulator", "healthcheck"]
       interval: 10s
@@ -146,7 +155,9 @@ services:
       ARM_ENTRA_TLS_INSECURE: "true"
       ARM_TENANT_ID: *tenant
       ARM_SUBSCRIPTION_ID: *subscription
-      ARM_DATA_DIR: "" # see STATE note above
+      ARM_DATA_DIR: "${ARM_DATA_DIR-/data}" # see STATE note above
+    volumes:
+      - arm-data:/data
     healthcheck:
       test: ["CMD", "/usr/local/bin/arm-emulator", "healthcheck"]
       interval: 10s
@@ -202,7 +213,9 @@ services:
       # Azure's own *.vault.azure.net, plus whatever this names. Without it a
       # reference to the vault beside it here is refused at connection create.
       FABRIC_AKV_VAULT_HOST: "keyvault-emulator:8444"
-      FABRIC_DATA_DIR: "" # see STATE note above
+      FABRIC_DATA_DIR: "${FABRIC_DATA_DIR-/data}" # see STATE note above
+    volumes:
+      - fabric-data:/data
 
   # API Management: management plane (ARM 2024-05-01), gateway, policies. A
   # consumer like fabric, so it sits behind a profile:
@@ -221,9 +234,22 @@ services:
       APIM_ENTRA_ISSUER: "https://entra-emulator:8443/6f89cf12-978b-4d23-ac18-9ef0c127cf87/v2.0"
       APIM_ENTRA_JWKS_URL: "https://entra-emulator:8443/6f89cf12-978b-4d23-ac18-9ef0c127cf87/discovery/v2.0/keys"
       APIM_ENTRA_TLS_INSECURE: "true"
-      APIM_DATA_DIR: "" # see STATE note above
+      APIM_DATA_DIR: "${APIM_DATA_DIR-/data}" # see STATE note above
+    volumes:
+      - apim-data:/data
     healthcheck:
       test: ["CMD", "/usr/local/bin/azure-apim-emulator", "healthcheck"]
       interval: 10s
       timeout: 3s
       retries: 5
+
+# Named, so they outlive the containers. `docker compose down` keeps them and
+# `down -v` is the reset — see the STATE note at the top. Compose prefixes each
+# with the project name, so a stack started under `-p foo` cannot read another
+# project's state.
+volumes:
+  entra-data:
+  keyvault-data:
+  arm-data:
+  fabric-data:
+  apim-data:

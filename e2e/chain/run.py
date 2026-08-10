@@ -62,7 +62,22 @@ PORTS = {
 COMPOSE = ["docker", "compose", "-p", PROJECT,
            "--profile", "apim", "--profile", "fabric",
            "-f", str(REPO / "docker-compose.yml")]
-ENV = {**os.environ, **PORTS}
+# The compose file PERSISTS by default, which is what a human wants and the
+# opposite of what this test wants: a chain that inherits the previous run's
+# vault, grants and directory is not proving the stack composes from nothing.
+# Explicitly empty means in-memory (the `-` defaults in the compose file are
+# what make that reachable), so every run starts bare no matter what is in the
+# volumes. Belt as well as braces: the teardown does `down -v`, but a cancelled
+# run never reaches it, and THAT is the case this covers.
+EPHEMERAL = {
+    "ENTRA_DATA_DIR": "",
+    "DB_PATH": "",  # entra bakes it, so the directory alone is a no-op
+    "KV_DATA_DIR": "",
+    "ARM_DATA_DIR": "",
+    "FABRIC_DATA_DIR": "",
+    "APIM_DATA_DIR": "",
+}
+ENV = {**os.environ, **PORTS, **EPHEMERAL}
 
 TENANT = "6f89cf12-978b-4d23-ac18-9ef0c127cf87"
 SUB = "6082bfda-63d0-46f4-8272-ae9195139feb"
