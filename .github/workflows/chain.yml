@@ -46,7 +46,7 @@ jobs:
     name: The BOM composes and trusts itself
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest # Docker + compose preinstalled
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
       - name: Validate the compose file
@@ -65,7 +65,7 @@ jobs:
     name: Does :latest still compose? (nightly)
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     env:
       ENTRA_EMULATOR_VERSION: latest
       KEYVAULT_EMULATOR_VERSION: latest

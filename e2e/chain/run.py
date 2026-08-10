@@ -21,8 +21,10 @@ So this test asserts the seam, not the semantics:
     4. keyvault ACCEPTS entra's token on a real data-plane call, and ARM's
        seeded grant reaches it — 404, not 403.
     5. apim ACCEPTS the ARM-audience token on its own management surface.
-    6. a token from the WRONG issuer is refused — proving steps 3-5 passed
-       because the trust chain holds, not because validation is absent.
+    6. fabric ACCEPTS a Fabric-audience token on /v1/workspaces.
+    7. a token from the WRONG issuer is refused by all three — proving steps
+       3-6 passed because the trust chain holds, not because validation is
+       absent.
 
 Stdlib-only, like the family's other e2e scripts.
 
@@ -51,10 +53,14 @@ PORTS = {
     "KEYVAULT_PORT": os.environ.get("KEYVAULT_PORT", "18444"),
     "ARM_PORT": os.environ.get("ARM_PORT", "18445"),
     "APIM_PORT": os.environ.get("APIM_PORT", "18446"),
+    "FABRIC_PORT": os.environ.get("FABRIC_PORT", "19443"),
 }
-# --profile apim: the chain certifies the profiled consumer too — its ARM
-# surface must accept entra's token the same way arm's does.
-COMPOSE = ["docker", "compose", "-p", PROJECT, "--profile", "apim",
+# BOTH profiles: the chain certifies the profiled consumers too, and a
+# profile left out is a member this test silently never covers. fabric was
+# exactly that — the largest image in the family, absent from the one check
+# that exists to prove the family composes.
+COMPOSE = ["docker", "compose", "-p", PROJECT,
+           "--profile", "apim", "--profile", "fabric",
            "-f", str(REPO / "docker-compose.yml")]
 ENV = {**os.environ, **PORTS}
 
@@ -68,6 +74,7 @@ ENTRA = f"https://localhost:{PORTS['ENTRA_PORT']}"
 KV = f"https://localhost:{PORTS['KEYVAULT_PORT']}"
 ARM = f"https://localhost:{PORTS['ARM_PORT']}"
 APIM = f"https://localhost:{PORTS['APIM_PORT']}"
+FABRIC = f"https://localhost:{PORTS['FABRIC_PORT']}"
 ARM_API = "2021-04-01"
 APIM_API = "2024-05-01"
 KV_API = "7.5"
@@ -203,8 +210,18 @@ def main():
             sys.exit(f"FAIL: apim refused entra's token (401): {raw[:300]}")
         step(5, f"apim accepted the ARM-audience token (HTTP {status})")
 
-        # 6. A token from the wrong issuer must be refused — otherwise steps
-        #    3-5 prove nothing about the trust chain.
+        # 6. fabric accepts a FABRIC-audience token. Its own audience, not
+        #    ARM's: fabric serves api.fabric rather than an ARM provider, so
+        #    reusing arm_tok here would assert the wrong contract and pass for
+        #    the wrong reason.
+        fab_tok = token("https://api.fabric.microsoft.com/.default")
+        status, raw = http("GET", f"{FABRIC}/v1/workspaces", bearer(fab_tok))
+        if status == 401:
+            sys.exit(f"FAIL: fabric refused entra's token (401): {raw[:300]}")
+        step(6, f"fabric accepted the Fabric-audience token (HTTP {status})")
+
+        # 7. A token from the wrong issuer must be refused — otherwise steps
+        #    3-6 prove nothing about the trust chain.
         bogus = (
             "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9."
             "eyJpc3MiOiJodHRwczovL2V2aWwuZXhhbXBsZS8iLCJhdWQiOiJodHRwczovL21hbmFnZW1lbnQuYXp1cmUuY29tIn0."
@@ -225,7 +242,11 @@ def main():
         )
         if status != 401:
             sys.exit(f"FAIL: apim accepted a foreign-issuer token (HTTP {status})")
-        step(6, "arm and apim rejected a foreign-issuer token (401) — the gate is real")
+        status, _ = http("GET", f"{FABRIC}/v1/workspaces", bearer(bogus))
+        if status != 401:
+            sys.exit(f"FAIL: fabric accepted a foreign-issuer token (HTTP {status})")
+        step(7, "arm, apim and fabric rejected a foreign-issuer token (401) — "
+                "the gate is real")
 
     finally:
         if keep:
