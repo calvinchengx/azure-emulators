@@ -95,11 +95,16 @@ PINS = [
     *[("azure-keyvault-emulator", f"e2e/{suite}/run.py",
        r'"ENTRA_VERSION",\s*"(v[\d.]+)"', ENTRA, "error")
       for suite in ("sdk", "chain", "az-cli", "arm-chain")],
-    # arm's az-cli witness does the same: on a CI runner there is no sibling
-    # checkout, so it `go install`s this entra release and the real Azure CLI
-    # authenticates against it. A stale pin here would quietly witness arm's
-    # parity claims against a retired entra.
-    ("arm-emulator", "e2e/az-cli/run.py",
+    # arm's suites do the same: on a CI runner there is no sibling checkout, so
+    # they `go install` this entra release and the real Azure CLI authenticates
+    # against it. A stale pin here would quietly witness arm's parity claims
+    # against a retired entra.
+    #
+    # The pin used to sit in e2e/az-cli/run.py; arm has since hoisted the
+    # bring-up into e2e/emulators.py, which every arm suite imports. So this is
+    # not merely the same pin at a new path — it is now the ONE pin governing
+    # all of them, which is why the entry stayed singular after the move.
+    ("arm-emulator", "e2e/emulators.py",
      r'"ENTRA_VERSION",\s*"(v[\d.]+)"', ENTRA, "error"),
     *[("azure-keyvault-emulator", f"e2e/{suite}/run.py",
        r'"ARM_VERSION",\s*"(v[\d.]+)"', ARM, "error")
