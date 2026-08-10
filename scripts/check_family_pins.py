@@ -99,8 +99,15 @@ PINS = [
     # checkout, so it `go install`s this entra release and the real Azure CLI
     # authenticates against it. A stale pin here would quietly witness arm's
     # parity claims against a retired entra.
-    ("arm-emulator", "e2e/az-cli/run.py",
-     r'"ENTRA_VERSION",\s*"(v[\d.]+)"', ENTRA, "error"),
+    # The pin used to sit in e2e/az-cli/run.py; arm has since lifted its emulator
+    # plumbing into e2e/emulators.py, which every suite imports, so the literal
+    # moved with it. Watch it where it lives — pointing at the old file made this
+    # gate report "pin pattern not found", which is the loud failure the manifest
+    # comment above promises, and the wrong repair would have been to drop the
+    # entry and stop checking arm at all.
+    ("arm-emulator", "e2e/emulators.py",
+     r'ENTRA_VERSION = os\.environ\.get\("ENTRA_VERSION", "(v[\d.]+)"\)',
+     ENTRA, "error"),
     *[("azure-keyvault-emulator", f"e2e/{suite}/run.py",
        r'"ARM_VERSION",\s*"(v[\d.]+)"', ARM, "error")
       for suite in ("az-cli", "arm-chain")],
