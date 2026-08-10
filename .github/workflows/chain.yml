@@ -34,6 +34,13 @@ concurrency:
   group: chain-${{ github.ref }}-${{ github.event_name == 'schedule' && 'drift' || 'certified' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# Least privilege for the whole workflow: every job here only checks out and
+# runs compose/scripts — no gh api, no GITHUB_TOKEN, no secrets, nothing pushed —
+# so read is all the chain needs. Without this the jobs inherit the repository
+# default, which can be write-all.
+permissions:
+  contents: read
+
 jobs:
   certified:
     name: The BOM composes and trusts itself
