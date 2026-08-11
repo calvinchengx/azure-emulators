@@ -193,7 +193,7 @@ services:
   # never starts or pulls.
   fabric-emulator:
     profiles: [fabric]
-    image: ghcr.io/calvinchengx/fabric-emulator:${FABRIC_EMULATOR_VERSION:-0.22.0}
+    image: ghcr.io/calvinchengx/fabric-emulator:${FABRIC_EMULATOR_VERSION:-0.23.0}
     depends_on:
       entra-emulator:
         condition: service_healthy
@@ -232,7 +232,7 @@ services:
   # 8446; inside the network the two never collide (different containers).
   apim-emulator:
     profiles: [apim]
-    image: ghcr.io/calvinchengx/azure-apim-emulator:${APIM_EMULATOR_VERSION:-0.1.0}
+    image: ghcr.io/calvinchengx/azure-apim-emulator:${APIM_EMULATOR_VERSION:-0.2.0}
     depends_on:
       entra-emulator:
         condition: service_healthy
