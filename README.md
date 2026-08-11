@@ -1,5 +1,8 @@
 # azure-emulators
 
+[![Family chain](https://github.com/calvinchengx/azure-emulators/actions/workflows/chain.yml/badge.svg)](https://github.com/calvinchengx/azure-emulators/actions/workflows/chain.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+
 **📖 [calvinchengx.github.io/azure-emulators](https://calvinchengx.github.io/azure-emulators/)** — quickstart, the family, release coordination, and what the chain test proves.
 
 The Azure emulator family, composed. **This repo runs no emulator of its own** —
@@ -84,9 +87,27 @@ ENTRA_EMULATOR_VERSION=latest docker compose up -d   # try tomorrow's entra
 
 ## State
 
-Nothing mounts a volume, so nothing survives `docker compose down` — see the
-notes at the top of [`docker-compose.yml`](docker-compose.yml) for how to add
-one, and for the keyvault image's current `/data` ownership caveat.
+**State persists.** Every service writes its SQLite database to a named volume,
+so a directory you seed once is still there tomorrow:
+
+| cycle | state |
+|---|---|
+| `up` / `down` / `up` | survives |
+| `stop` / `start` / `restart` | survives |
+| `down -v` | **the reset** |
+
+Wiping is the deliberate act, and `down` alone no longer does it. For a
+throwaway stack, set any data directory explicitly empty — that selects
+in-memory:
+
+```sh
+KV_DATA_DIR= docker compose up
+```
+
+`e2e/chain/run.py` takes that path for every service, because a chain that
+inherits the previous run's state proves less than it claims. The notes at the
+top of [`docker-compose.yml`](docker-compose.yml) carry the detail, including
+why entra needs two settings rather than one.
 
 ## The chain test
 
@@ -137,10 +158,12 @@ from Microsoft's published specs, and no repo computes it today.
 The evidence table counts **claims, not citations**, and classifies each claim
 once by its strongest witness: `ci:` a packaged external client in CI, `sdk:`
 Microsoft's own client linked in process, otherwise our own client on both ends
-of the wire. Citations were the first cut and they flatter: one claim can carry
-several witnesses, so keyvault's 71 third-party citations spread across only 28
-of its 48 claims. The share at the end is the honest headline — how much of
-what an emulator claims has been proved by something that is not us.
+of the wire. Citations were the first cut and they flatter, because one claim
+can carry several witnesses: keyvault's third-party citations outnumber the
+claims they cover by roughly two to one. The share at the end is the honest
+headline — how much of what an emulator claims has been proved by something
+that is not us. Run the script for the current figures rather than trusting a
+number written here, which is exactly the drift this paragraph describes.
 
 ## Release coordination: the BOM
 
@@ -188,3 +211,8 @@ stack denying by default and every test still green.
 
 - **Renovate/dependabot** — keep the pinned image versions moving.
 - **`az` CLI leg** — drive the same chain through the real Azure CLI.
+
+## License
+
+Apache-2.0. This repo composes the family and ships no emulator of its own, so
+the compose file here is meant to be copied into your own stack.
