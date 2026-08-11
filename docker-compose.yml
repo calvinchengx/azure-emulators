@@ -193,7 +193,7 @@ services:
   # never starts or pulls.
   fabric-emulator:
     profiles: [fabric]
-    image: ghcr.io/calvinchengx/fabric-emulator:${FABRIC_EMULATOR_VERSION:-0.20.0}
+    image: ghcr.io/calvinchengx/fabric-emulator:${FABRIC_EMULATOR_VERSION:-0.22.0}
     depends_on:
       entra-emulator:
         condition: service_healthy
@@ -207,11 +207,19 @@ services:
       FABRIC_ENTRA_ISSUER: "https://entra-emulator:8443/6f89cf12-978b-4d23-ac18-9ef0c127cf87/v2.0"
       FABRIC_ENTRA_JWKS_URL: "https://entra-emulator:8443/6f89cf12-978b-4d23-ac18-9ef0c127cf87/discovery/v2.0/keys"
       FABRIC_ENTRA_TLS_INSECURE: "true"
-      # REQUIRED since fabric 0.20.0 for AzureKeyVaultReference connections.
+      # REQUIRED since fabric 0.20.0 for vault-backed connection credentials.
       # Resolving one sends a vault-audience bearer token to the host the
       # connection names, so fabric refuses any host not on its allowlist —
       # Azure's own *.vault.azure.net, plus whatever this names. Without it a
       # reference to the vault beside it here is refused at connection create.
+      #
+      # The SHAPE changed in 0.22.0 and this comment named the old one:
+      # `credentialType: "AzureKeyVaultReference"` is not a Fabric credential
+      # type and is now rejected. A vault-backed credential is the owning type
+      # carrying a reference — `credentialType: "Key"` with
+      # `keyReference: {connectionId, secretName}` — where connectionId names a
+      # connection of type AzureKeyVault. This variable is unchanged and still
+      # required; only the payload that reaches it is different.
       FABRIC_AKV_VAULT_HOST: "keyvault-emulator:8444"
       FABRIC_DATA_DIR: "${FABRIC_DATA_DIR-/data}" # see STATE note above
     volumes:
