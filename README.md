@@ -12,10 +12,10 @@ and *tested against each other*.
 
 **The point of the family is speed for an AI coding agent.** Proving a data
 product, or any Azure-shaped automation, against the real services means a paid
-tenant and slow, hard-to-reset round trips. This family lets Claude, Codex, Grok,
-whichever agent is doing the work, build and prove the whole thing offline
-first, then move to a real tenant with no code changes: months of tenant-bound
-iteration becomes a day, or a week. See
+tenant and slow, hard-to-reset round trips. This family lets Claude, Codex,
+Grok, Kimi K3, whichever agent is doing the work, build and prove the whole
+thing offline first, then move to a real tenant with no code changes: months
+of tenant-bound iteration becomes a day, or a week. See
 [fabric-emulator](https://github.com/calvinchengx/fabric-emulator) for the full
 argument, and [contoso-data-platform](https://github.com/calvinchengx/contoso-data-platform)
 for what it looks like end to end.
