@@ -23,11 +23,13 @@ like the family's other e2e scripts.
 3. **arm accepts entra's token** and performs a real write (a resource group);
 4. **keyvault authorizes entra's token** on a real data-plane call;
 5. **apim accepts the ARM-audience token** on its own management surface;
-6. a **foreign-issuer token is refused** — so steps 3–5 passed because the
+6. **fabric accepts a Fabric-audience token** on `/v1/workspaces`;
+7. **an ARM-created Fabric capacity appears** on fabric `GET /v1/capacities`;
+8. a **foreign-issuer token is refused** — so steps 3–7 passed because the
    trust chain holds, not because validation is absent.
 
-Step 6 is what makes the rest mean anything. Without it, an emulator that
-skipped validation entirely would sail through steps 3–5.
+Step 8 is what makes the rest mean anything. Without it, an emulator that
+skipped validation entirely would sail through steps 3–7.
 
 ## Reading a failure
 
@@ -43,6 +45,10 @@ the step:
 Until the BOM wired `KV_ARM_URL`, a `403` was an accepted pass, which would
 have let a broken seed ship. The vault *polls* ARM, so the grant is not
 visible the instant `arm-seed` exits — the step retries rather than races.
+
+Step 7 is the capacities equivalent. Until the BOM wired `FABRIC_ARM_URL`,
+workspaces could 200 while `GET /v1/capacities` stayed on the seeded row —
+a silent miss. Fabric *polls* ARM too, so the step retries rather than races.
 
 ## Seam, not semantics
 

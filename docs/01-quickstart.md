@@ -61,6 +61,14 @@ KV_ARM_URL= docker compose up
 The empty value is deliberate — the compose file uses `${KV_ARM_URL-…}`
 (single dash), so *explicitly empty* opts out while *unset* gets the default.
 
+The fabric profile is the same shape for capacities. Unset `FABRIC_ARM_URL`
+wires fabric to the sibling arm; an ARM-created `Microsoft.Fabric/capacities`
+resource then appears on `GET /v1/capacities`. Opt out the same way:
+
+```sh
+FABRIC_ARM_URL= docker compose --profile fabric up
+```
+
 ## Ports are overridable
 
 Every port is a variable, so the family can coexist with anything already

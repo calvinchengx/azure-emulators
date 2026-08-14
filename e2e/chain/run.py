@@ -22,8 +22,10 @@ So this test asserts the seam, not the semantics:
        seeded grant reaches it — 404, not 403.
     5. apim ACCEPTS the ARM-audience token on its own management surface.
     6. fabric ACCEPTS a Fabric-audience token on /v1/workspaces.
-    7. a token from the WRONG issuer is refused by all three — proving steps
-       3-6 passed because the trust chain holds, not because validation is
+    7. an ARM-created Microsoft.Fabric/capacities resource appears on
+       fabric GET /v1/capacities (FABRIC_ARM_URL is wired, as KV_ARM_URL is).
+    8. a token from the WRONG issuer is refused by all three — proving steps
+       3-7 passed because the trust chain holds, not because validation is
        absent.
 
 Stdlib-only, like the family's other e2e scripts.
@@ -235,8 +237,49 @@ def main():
             sys.exit(f"FAIL: fabric refused entra's token (401): {raw[:300]}")
         step(6, f"fabric accepted the Fabric-audience token (HTTP {status})")
 
-        # 7. A token from the wrong issuer must be refused — otherwise steps
-        #    3-6 prove nothing about the trust chain.
+        # 7. An ARM-created Fabric capacity appears on fabric's list. Until
+        #    the BOM wired FABRIC_ARM_URL this would have been a silent miss:
+        #    workspaces 200 while capacities stayed the seeded row. The
+        #    consume path polls, so retry rather than race.
+        cap = "chaincap"
+        status, raw = http(
+            "PUT",
+            f"{ARM}/subscriptions/{SUB}/resourceGroups/{rg}/providers"
+            f"/Microsoft.Fabric/capacities/{cap}?api-version=2023-11-01",
+            bearer(arm_tok),
+            {
+                "location": "westeurope",
+                "sku": {"name": "F2", "tier": "Fabric"},
+                "properties": {
+                    "administration": {"members": ["chain@example.com"]},
+                },
+            },
+        )
+        if status not in (200, 201):
+            sys.exit(f"FAIL: arm create capacity = {status} {raw[:300]}")
+        seed = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+        deadline = time.time() + 30
+        seen = None
+        while time.time() < deadline:
+            status, raw = http("GET", f"{FABRIC}/v1/capacities", bearer(fab_tok))
+            if status == 401:
+                sys.exit(f"FAIL: fabric refused the token listing capacities: {raw[:300]}")
+            if status == 200:
+                extra = [
+                    c.get("id")
+                    for c in (json.loads(raw).get("value") or [])
+                    if c.get("id") and c.get("id") != seed
+                ]
+                if extra:
+                    seen = extra[0]
+                    break
+            time.sleep(1)
+        if not seen:
+            sys.exit("FAIL: ARM-created capacity never appeared on GET /v1/capacities")
+        step(7, f"fabric listed ARM-created capacity {seen}")
+
+        # 8. A token from the wrong issuer must be refused — otherwise steps
+        #    3-7 prove nothing about the trust chain.
         bogus = (
             "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9."
             "eyJpc3MiOiJodHRwczovL2V2aWwuZXhhbXBsZS8iLCJhdWQiOiJodHRwczovL21hbmFnZW1lbnQuYXp1cmUuY29tIn0."
@@ -260,7 +303,7 @@ def main():
         status, _ = http("GET", f"{FABRIC}/v1/workspaces", bearer(bogus))
         if status != 401:
             sys.exit(f"FAIL: fabric accepted a foreign-issuer token (HTTP {status})")
-        step(7, "arm, apim and fabric rejected a foreign-issuer token (401) — "
+        step(8, "arm, apim and fabric rejected a foreign-issuer token (401) — "
                 "the gate is real")
 
     finally:

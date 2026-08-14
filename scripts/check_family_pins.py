@@ -109,6 +109,11 @@ PINS = [
     *[("azure-keyvault-emulator", f"e2e/{suite}/run.py",
        r'"ARM_VERSION",\s*"(v[\d.]+)"', ARM, "error")
       for suite in ("az-cli", "arm-chain")],
+    # fabric's ARM-capacities harness go-installs this arm release on CI
+    # runners (no sibling checkout). A stale pin would witness FABRIC_ARM_URL
+    # against an arm that does not serve Microsoft.Fabric/capacities.
+    ("fabric-emulator", "e2e/arm-capacities/run.py",
+     r'"ARM_VERSION",\s*"(v[\d.]+)"', ARM, "error"),
     # fabric's fab-driven example pins entra's image the same way this repo does.
     ("fabric-emulator", "examples/fab-driven/.env", ENTRA_ENV, ENTRA, "error"),
     # contoso-data-platform is a CONSUMER, not a family member: it is what a
