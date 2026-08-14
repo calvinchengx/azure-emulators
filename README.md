@@ -193,7 +193,7 @@ number written here, which is exactly the drift this paragraph describes.
 ## Release coordination: the BOM
 
 The version defaults in [`docker-compose.yml`](docker-compose.yml) —
-`${ENTRA_EMULATOR_VERSION:-0.6.0}` and friends — are the family's **bill of
+`${ENTRA_EMULATOR_VERSION:-0.7.0}` and friends — are the family's **bill of
 materials**: the newest combination of released images proven to work
 together. A bare `docker compose up` runs exactly that set; per-variable
 overrides (environment or an uncommitted local `.env`) still win.
