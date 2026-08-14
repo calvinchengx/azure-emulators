@@ -36,6 +36,14 @@ vault that allows any authenticated caller:
 KV_ARM_URL= docker compose up
 ```
 
+The fabric profile does the same for capacities: ARM-created
+`Microsoft.Fabric/capacities` resources appear on `GET /v1/capacities`. To
+keep fabric's seeded local capacity only:
+
+```sh
+FABRIC_ARM_URL= docker compose --profile fabric up
+```
+
 ## The family
 
 Each emulator lives in its own repo and publishes its own image to GHCR on its
