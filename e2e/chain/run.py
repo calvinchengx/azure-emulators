@@ -402,9 +402,27 @@ def main():
         )
         if status not in (200, 201, 202):
             sys.exit(f"FAIL: fabric run pipeline: {status} {raw[:300]}")
-        deadline = time.time() + 60
+        deadline = time.time() + 90
         listed = None
+        fabric_detail = ""
         while time.time() < deadline:
+            status, raw = http(
+                "GET",
+                f"{FABRIC}/v1/workspaces/{wsid}/items/{pid}/jobs/instances",
+                bearer(fab_tok),
+            )
+            if status == 200:
+                inst = (json.loads(raw).get("value") or [None])[0] or {}
+                jid = inst.get("id")
+                if jid:
+                    st, body = http(
+                        "POST",
+                        f"{FABRIC}/v1/workspaces/{wsid}/items/{pid}/jobs/instances/{jid}/queryactivityruns",
+                        bearer(fab_tok),
+                        {},
+                    )
+                    if st == 200:
+                        fabric_detail = body[:500]
             status, raw = http(
                 "GET", f"{DATABRICKS}/api/2.2/jobs/list", bearer(pat)
             )
@@ -415,7 +433,7 @@ def main():
             time.sleep(1)
         if not listed:
             sys.exit("FAIL: fabric DatabricksSparkPython never created a "
-                     "databricks job")
+                     f"databricks job; fabric activity={fabric_detail or 'none'}")
         step(10, f"fabric submitted DatabricksSparkPython; databricks job "
                  f"{listed[0].get('job_id')} exists")
 
