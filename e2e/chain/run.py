@@ -322,7 +322,10 @@ def main():
             "GET", f"{DATABRICKS}/api/2.0/preview/scim/v2/Me", bearer(dbx_tok)
         )
         me = json.loads(raw) if status == 200 else {}
-        if status != 200 or me.get("userName") != "admin":
+        # A client-credentials token is the daemon app, not the seeded PAT
+        # admin. 200 with that principal is the federated door; admin would
+        # mean we reused the PAT by mistake.
+        if status != 200 or me.get("userName") != SP_CLIENT:
             sys.exit(f"FAIL: databricks federated JWT Me: {status} {raw[:300]}")
         step(9, "databricks accepted an entra Databricks-audience token on /Me")
 
