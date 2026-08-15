@@ -3,7 +3,7 @@
 
 Two questions get asked often enough to be worth automating: how much of each
 emulator is graded green, and what evidence stands behind those greens. Both
-answers already exist, spread across five repos as docs/parity.md and
+answers already exist, spread across the member repos as docs/parity.md and
 docs/witnesses.json. This assembles them.
 
 WHY IT READS EACH REPO'S OWN CHECKER. Counting 🟢 with a grep gives the wrong
@@ -31,7 +31,7 @@ Stdlib only, like the family's other scripts.
     ./scripts/family_parity.py --local ..   read sibling checkouts instead of main
     ./scripts/family_parity.py entra        one member, in detail
 
-A member name switches to a report the five-row table cannot carry: the same
+A member name switches to a report the family table cannot carry: the same
 counts, plus every green claim that rests on our own client alone, by name.
 That list is the actionable part — "37 uncovered" tells a maintainer nothing
 about where to start, and the names do.
@@ -54,6 +54,7 @@ REPOS = [
     ("azure-keyvault-emulator", "keyvault"),
     ("azure-apim-emulator", "apim"),
     ("arm-emulator", "arm"),
+    ("databricks-emulator", "databricks"),
 ]
 
 # apim's word grades, mapped onto the family's three buckets. `sdk-verified`

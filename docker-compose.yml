@@ -11,6 +11,13 @@
 #     heavier image and most callers of this file don't need it; fabric's own
 #     repo carries the richer overlays (compute, rti, governance, terminal).
 #
+#   docker compose --profile databricks up
+#     …adds databricks-emulator :8447 (Databricks workspace REST). Identity
+#     is PAT + its own OIDC; entra is an optional federated issuer and
+#     keyvault an optional secret backend. Fabric activities submit here
+#     only when FABRIC_DATABRICKS_URL is set — the fabric profile does not
+#     depend on this one.
+#
 # WHY THREE CONTAINERS, NOT ONE
 # Each emulator is a static Go binary on distroless, so all three share one
 # base layer and cost a few tens of MB of RSS — bundling saves essentially
@@ -255,6 +262,37 @@ services:
       timeout: 3s
       retries: 5
 
+  # Databricks workspace. Identity is PAT + this process's OIDC; entra is
+  # an optional federated issuer and keyvault an optional live secret
+  # backend. Opt in with `--profile databricks`.
+  databricks-emulator:
+    profiles: [databricks]
+    image: ghcr.io/calvinchengx/databricks-emulator:${DATABRICKS_EMULATOR_VERSION:-0.1.0}
+    depends_on:
+      entra-emulator:
+        condition: service_healthy
+      keyvault-emulator:
+        condition: service_healthy
+    ports:
+      - "${DATABRICKS_PORT:-8447}:8447"
+    environment:
+      DATABRICKS_DATA_DIR: "${DATABRICKS_DATA_DIR-/data}"
+      DATABRICKS_PUBLIC_URL: "https://databricks-emulator:8447"
+      DATABRICKS_OIDC_ISSUERS: "https://entra-emulator:8443/6f89cf12-978b-4d23-ac18-9ef0c127cf87/v2.0"
+      DATABRICKS_OIDC_TLS_INSECURE: "true"
+      DATABRICKS_AKV_VAULT_HOST: "keyvault-emulator:8444"
+      DATABRICKS_AKV_TLS_INSECURE: "true"
+      DATABRICKS_ENTRA_TOKEN_URL: "https://entra-emulator:8443/6f89cf12-978b-4d23-ac18-9ef0c127cf87/oauth2/v2.0/token"
+      DATABRICKS_ENTRA_CLIENT_ID: "00d88624-f0d7-46f6-a641-6232c2608928"
+      DATABRICKS_ENTRA_CLIENT_SECRET: "daemon-app-secret"
+    volumes:
+      - databricks-data:/data
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/databricks-emulator", "healthcheck"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
 # Named, so they outlive the containers. `docker compose down` keeps them and
 # `down -v` is the reset — see the STATE note at the top. Compose prefixes each
 # with the project name, so a stack started under `-p foo` cannot read another
@@ -265,3 +303,4 @@ volumes:
   arm-data:
   fabric-data:
   apim-data:
+  databricks-data:

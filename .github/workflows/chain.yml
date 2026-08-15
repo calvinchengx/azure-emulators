@@ -10,7 +10,7 @@
 #              certified set no longer composes — and blocks the merge.
 #
 #   drift      :latest across the board. Runs nightly, because this failure
-#              mode arrives from OUTSIDE: any of the four repos can publish a
+#              mode arrives from OUTSIDE: any of the member repos can publish a
 #              release that breaks the family without a commit landing here.
 #              A red here means an upstream release needs triage and the BOM
 #              is your rollback — a bare `docker compose up` still works.
@@ -53,6 +53,8 @@ jobs:
         run: |
           docker compose -f docker-compose.yml config >/dev/null
           docker compose -f docker-compose.yml --profile fabric config >/dev/null
+          docker compose -f docker-compose.yml --profile apim config >/dev/null
+          docker compose -f docker-compose.yml --profile databricks config >/dev/null
       - name: Run the chain (BOM versions)
         run: ./e2e/chain/run.py
       - name: Diagnose on failure
@@ -71,6 +73,8 @@ jobs:
       KEYVAULT_EMULATOR_VERSION: latest
       ARM_EMULATOR_VERSION: latest
       FABRIC_EMULATOR_VERSION: latest
+      APIM_EMULATOR_VERSION: latest
+      DATABRICKS_EMULATOR_VERSION: latest
     steps:
       - uses: actions/checkout@v7
       - name: Run the chain (:latest)
