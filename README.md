@@ -45,6 +45,10 @@ keep fabric's seeded local capacity only:
 FABRIC_ARM_URL= docker compose --profile fabric up
 ```
 
+Fabric Databricks activities submit to the sibling workspace only when
+`FABRIC_DATABRICKS_URL` is set. A bare `--profile fabric` does not start
+databricks. `token=dev` is 401 — the chain scrapes the seeded PAT.
+
 ## The family
 
 Each emulator lives in its own repo and publishes its own image to GHCR on its
@@ -195,7 +199,7 @@ number written here, which is exactly the drift this paragraph describes.
 ## Release coordination: the BOM
 
 The version defaults in [`docker-compose.yml`](docker-compose.yml) —
-`${ENTRA_EMULATOR_VERSION:-0.7.0}` and friends — are the family's **bill of
+`${ENTRA_EMULATOR_VERSION:-0.8.1}` and friends — are the family's **bill of
 materials**: the newest combination of released images proven to work
 together. A bare `docker compose up` runs exactly that set; per-variable
 overrides (environment or an uncommitted local `.env`) still win.

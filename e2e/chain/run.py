@@ -25,8 +25,13 @@ So this test asserts the seam, not the semantics:
     7. an ARM-created Microsoft.Fabric/capacities resource appears on
        fabric GET /v1/capacities (FABRIC_ARM_URL is wired, as KV_ARM_URL is).
     8. databricks ACCEPTS its seeded PAT on /Me and refuses token=dev.
-    9. a token from the WRONG issuer is refused by arm, apim, fabric and
-       databricks — proving steps 3-8 passed because the trust chain holds,
+    9. entra mints a Databricks-audience token; databricks ACCEPTS it on /Me.
+   10. fabric, recreated with that PAT, submits a DatabricksSparkPython
+       activity against dbfs:/jobs/chain.py — the job exists on databricks.
+       Failed naming the missing Spark engine is an honest pass: family
+       compose has no Spark sidecar.
+   11. a token from the WRONG issuer is refused by arm, apim, fabric and
+       databricks — proving steps 3-10 passed because the trust chain holds,
        not because validation is absent.
 
 Stdlib-only, like the family's other e2e scripts.
@@ -35,6 +40,7 @@ Stdlib-only, like the family's other e2e scripts.
     KEEP_UP=1 ./e2e/chain/run.py        # leave it running for poking at
 """
 
+import base64
 import json
 import os
 import ssl
@@ -283,8 +289,7 @@ def main():
 
         # 8. Databricks identity is PAT-native. The seeded admin PAT is
         #    printed once on first boot; token=dev is MiniLake's trap and
-        #    must stay 401. Entra is an optional federated issuer — this
-        #    step does not require a Databricks-audience token from entra.
+        #    must stay 401.
         logs = subprocess.check_output(
             COMPOSE + ["logs", "databricks-emulator"], env=ENV, text=True
         )
@@ -308,8 +313,111 @@ def main():
             sys.exit(f"FAIL: databricks accepted token=dev (HTTP {status})")
         step(8, "databricks accepted the seeded PAT and refused token=dev")
 
-        # 9. A token from the wrong issuer must be refused — otherwise steps
-        #    3-8 prove nothing about the trust chain.
+        # 9. The well-known Azure Databricks app id is a compile-time
+        #    carve-out on entra (like Fabric). A client_credentials token
+        #    at that audience must open /Me — otherwise DATABRICKS_OIDC_ISSUERS
+        #    is wired and unused.
+        dbx_tok = token("2ff814a6-3304-4ab8-85cb-cd0e6f879c1d/.default")
+        status, raw = http(
+            "GET", f"{DATABRICKS}/api/2.0/preview/scim/v2/Me", bearer(dbx_tok)
+        )
+        me = json.loads(raw) if status == 200 else {}
+        if status != 200 or me.get("userName") != "admin":
+            sys.exit(f"FAIL: databricks federated JWT Me: {status} {raw[:300]}")
+        step(9, "databricks accepted an entra Databricks-audience token on /Me")
+
+        # 10. Fabric activities submit to this host only when
+        #     FABRIC_DATABRICKS_URL is set. The PAT is ephemeral — scrape,
+        #     then recreate fabric with the three env vars. Seed a native
+        #     dbfs: path (fabric does not dbfs/put) and run
+        #     DatabricksSparkPython. Family compose has no Spark sidecar, so
+        #     the remote run FAILED naming the missing engine is the honest
+        #     submission pass; the job must exist on databricks.
+        ENV["FABRIC_DATABRICKS_URL"] = "https://databricks-emulator:8447"
+        ENV["FABRIC_DATABRICKS_TOKEN"] = pat
+        ENV["FABRIC_DATABRICKS_TLS_INSECURE"] = "true"
+        try:
+            compose("up", "-d", "--wait", "--no-deps", "fabric-emulator")
+        except subprocess.CalledProcessError:
+            subprocess.run(COMPOSE + ["logs", "--tail", "40", "fabric-emulator"],
+                           check=False, env=ENV)
+            sys.exit("FAIL: fabric never came back with FABRIC_DATABRICKS_URL")
+        py = b'print("chain")\n'
+        status, raw = http(
+            "POST", f"{DATABRICKS}/api/2.0/dbfs/put", bearer(pat),
+            {
+                "path": "/jobs/chain.py",
+                "contents": base64.b64encode(py).decode(),
+                "overwrite": True,
+            },
+        )
+        if status != 200:
+            sys.exit(f"FAIL: dbfs/put chain.py: {status} {raw[:300]}")
+        status, raw = http(
+            "POST", f"{FABRIC}/v1/workspaces", bearer(fab_tok),
+            {"displayName": "chain-dbx"},
+        )
+        if status not in (200, 201):
+            sys.exit(f"FAIL: fabric create workspace: {status} {raw[:300]}")
+        wsid = json.loads(raw)["id"]
+        status, raw = http(
+            "POST", f"{FABRIC}/v1/workspaces/{wsid}/items", bearer(fab_tok),
+            {"displayName": "chain-dbx-pl", "type": "DataPipeline"},
+        )
+        if status not in (200, 201, 202):
+            sys.exit(f"FAIL: fabric create pipeline: {status} {raw[:300]}")
+        pipe = json.loads(raw)
+        if "id" not in pipe:
+            sys.exit(f"FAIL: fabric create pipeline body: {raw[:300]}")
+        pid = pipe["id"]
+        definition = json.dumps({
+            "properties": {
+                "activities": [{
+                    "name": "Dbx",
+                    "type": "DatabricksSparkPython",
+                    "typeProperties": {"pythonFile": "dbfs:/jobs/chain.py"},
+                }],
+            },
+        }).encode()
+        status, raw = http(
+            "POST",
+            f"{FABRIC}/v1/workspaces/{wsid}/items/{pid}/updateDefinition",
+            bearer(fab_tok),
+            {"definition": {"parts": [{
+                "path": "pipeline-content.json",
+                "payload": base64.b64encode(definition).decode(),
+                "payloadType": "InlineBase64",
+            }]}},
+        )
+        if status not in (200, 201, 202):
+            sys.exit(f"FAIL: fabric updateDefinition: {status} {raw[:300]}")
+        status, raw = http(
+            "POST",
+            f"{FABRIC}/v1/workspaces/{wsid}/items/{pid}/jobs/instances?jobType=Pipeline",
+            bearer(fab_tok),
+            {},
+        )
+        if status not in (200, 201, 202):
+            sys.exit(f"FAIL: fabric run pipeline: {status} {raw[:300]}")
+        deadline = time.time() + 60
+        listed = None
+        while time.time() < deadline:
+            status, raw = http(
+                "GET", f"{DATABRICKS}/api/2.2/jobs/list", bearer(pat)
+            )
+            if status == 200:
+                listed = json.loads(raw).get("jobs") or []
+                if listed:
+                    break
+            time.sleep(1)
+        if not listed:
+            sys.exit("FAIL: fabric DatabricksSparkPython never created a "
+                     "databricks job")
+        step(10, f"fabric submitted DatabricksSparkPython; databricks job "
+                 f"{listed[0].get('job_id')} exists")
+
+        # 11. A token from the wrong issuer must be refused — otherwise steps
+        #     3-10 prove nothing about the trust chain.
         bogus = (
             "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9."
             "eyJpc3MiOiJodHRwczovL2V2aWwuZXhhbXBsZS8iLCJhdWQiOiJodHRwczovL21hbmFnZW1lbnQuYXp1cmUuY29tIn0."
@@ -338,8 +446,8 @@ def main():
         )
         if status != 401:
             sys.exit(f"FAIL: databricks accepted a foreign-issuer token (HTTP {status})")
-        step(9, "arm, apim, fabric and databricks rejected a foreign-issuer "
-                "token (401) — the gate is real")
+        step(11, "arm, apim, fabric and databricks rejected a foreign-issuer "
+                 "token (401) — the gate is real")
 
     finally:
         if keep:

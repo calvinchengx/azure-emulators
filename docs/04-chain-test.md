@@ -26,11 +26,16 @@ like the family's other e2e scripts.
 6. **fabric accepts a Fabric-audience token** on `/v1/workspaces`;
 7. **an ARM-created Fabric capacity appears** on fabric `GET /v1/capacities`;
 8. **databricks accepts its seeded PAT** on `/Me` and refuses `token=dev`;
-9. a **foreign-issuer token is refused** — so steps 3–8 passed because the
-   trust chain holds, not because validation is absent.
+9. **entra mints a Databricks-audience token** (`2ff814a6-3304-4ab8-85cb-cd0e6f879c1d`)
+   and databricks accepts it on `/Me`;
+10. **fabric submits a `DatabricksSparkPython` activity** against this host
+    (`dbfs:/jobs/chain.py`). The job exists on databricks. Failed naming the
+    missing Spark engine is an honest pass — family compose has no Spark sidecar;
+11. a **foreign-issuer token is refused** — so steps 3–10 passed because the
+    trust chain holds, not because validation is absent.
 
-Step 9 is what makes the rest mean anything. Without it, an emulator that
-skipped validation entirely would sail through steps 3–8.
+Step 11 is what makes the rest mean anything. Without it, an emulator that
+skipped validation entirely would sail through steps 3–10.
 
 ## Reading a failure
 
@@ -50,6 +55,16 @@ visible the instant `arm-seed` exits — the step retries rather than races.
 Step 7 is the capacities equivalent. Until the BOM wired `FABRIC_ARM_URL`,
 workspaces could 200 while `GET /v1/capacities` stayed on the seeded row —
 a silent miss. Fabric *polls* ARM too, so the step retries rather than races.
+
+Step 9 is the Databricks-audience equivalent of step 6. Until entra carved
+out `2ff814a6-3304-4ab8-85cb-cd0e6f879c1d`, `DATABRICKS_OIDC_ISSUERS` was
+wired and unused: every federated JWT was `invalid_resource` at mint time.
+
+Step 10 recreates fabric with the scraped PAT. The PAT is printed once on
+first boot, so compose cannot bake `FABRIC_DATABRICKS_TOKEN`. A missing
+databricks job means the activity never reached `jobs/create` — URL, token,
+or TLS. Failed naming the missing Spark engine is not a miss: this compose
+has no Spark sidecar.
 
 ## Seam, not semantics
 

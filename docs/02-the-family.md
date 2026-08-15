@@ -10,7 +10,7 @@ image. This repo composes them and proves they still trust each other.
 | [azure-keyvault-emulator](https://github.com/calvinchengx/azure-keyvault-emulator) | 8444 | Key Vault data plane — secrets, keys, certificates |
 | [fabric-emulator](https://github.com/calvinchengx/fabric-emulator) | 9443 | Fabric control plane + OneLake. A consumer — `fabric` profile |
 | [azure-apim-emulator](https://github.com/calvinchengx/azure-apim-emulator) | 8446 | API Management — management plane, gateway, policies. A consumer — `apim` profile |
-| [databricks-emulator](https://github.com/calvinchengx/databricks-emulator) | 8447 | Databricks workspace REST. PAT + its own OIDC; entra optional — `databricks` profile |
+| [databricks-emulator](https://calvinchengx.github.io/databricks-emulator/) | 8447 | Databricks workspace REST. PAT + its own OIDC; entra optional — `databricks` profile |
 
 ## Dependency order
 
@@ -28,6 +28,7 @@ graph LR
   entra --> apim
   entra -.->|optional federated issuer| dbx
   kv -.->|optional secret backend| dbx
+  fabric -.->|optional activities| dbx
   arm -->|governs| kv
 ```
 

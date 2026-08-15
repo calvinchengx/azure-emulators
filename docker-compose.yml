@@ -84,7 +84,7 @@ x-arm-subscription: &subscription "6082bfda-63d0-46f4-8272-ae9195139feb"
 
 services:
   entra-emulator:
-    image: ghcr.io/calvinchengx/entra-emulator:${ENTRA_EMULATOR_VERSION:-0.7.0}
+    image: ghcr.io/calvinchengx/entra-emulator:${ENTRA_EMULATOR_VERSION:-0.8.1}
     environment:
       ORIGIN_MODE: compat # single origin, path-prefixed surfaces
       PUBLIC_ORIGIN: "https://entra-emulator:8443"
@@ -232,6 +232,14 @@ services:
       # The `-` rather than `:-` matches KV_ARM_URL: an explicitly empty value
       # opts out (seeded local capacity only); unset gets the sibling.
       FABRIC_ARM_URL: "${FABRIC_ARM_URL-https://arm-emulator:8445}"
+      # Databricks activities submit here only when a URL is set. Empty keeps
+      # local Spark-agent termination and refuses dbfs: / /Workspace paths.
+      # The chain test scrapes databricks's seeded PAT after boot and
+      # recreates this service with the three set — a bare
+      # `--profile fabric` does not depend on `--profile databricks`.
+      FABRIC_DATABRICKS_URL: "${FABRIC_DATABRICKS_URL-}"
+      FABRIC_DATABRICKS_TOKEN: "${FABRIC_DATABRICKS_TOKEN-}"
+      FABRIC_DATABRICKS_TLS_INSECURE: "${FABRIC_DATABRICKS_TLS_INSECURE-}"
       FABRIC_DATA_DIR: "${FABRIC_DATA_DIR-/data}" # see STATE note above
     volumes:
       - fabric-data:/data
