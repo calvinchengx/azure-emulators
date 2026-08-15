@@ -22,8 +22,9 @@ for what it looks like end to end.
 
 ```sh
 docker compose up            # entra + keyvault + arm
-docker compose --profile fabric up   # …and fabric, the consumer
-docker compose --profile apim up     # …or apim, the other one
+docker compose --profile fabric up       # …and fabric, the consumer
+docker compose --profile apim up         # …or apim
+docker compose --profile databricks up   # …or the Databricks workspace
 ```
 
 ARM governs the vault, as it does in Azure: role assignments decide who may do
@@ -56,6 +57,7 @@ own release cadence. This repo pins and composes them.
 | `arm-emulator` | 8445 | [arm-emulator](https://github.com/calvinchengx/arm-emulator) | ARM control plane + `Microsoft.Authorization` RBAC |
 | `fabric-emulator` | 9443 | [fabric-emulator](https://github.com/calvinchengx/fabric-emulator) | Fabric control plane + OneLake. A **consumer** of the three above, so it sits behind a `fabric` profile |
 | `apim-emulator` | 8446 | [azure-apim-emulator](https://github.com/calvinchengx/azure-apim-emulator) | API Management — management plane, gateway, policies. A **consumer** too, behind an `apim` profile, but of entra alone: it serves its own `Microsoft.ApiManagement` ARM surface rather than calling arm |
+| `databricks-emulator` | 8447 | [databricks-emulator](https://github.com/calvinchengx/databricks-emulator) | Databricks workspace REST. Identity is PAT + its own OIDC; entra is an optional federated issuer. Behind a `databricks` profile |
 
 Not a service in this compose, but part of the family:
 [**contoso-data-platform**](https://github.com/calvinchengx/contoso-data-platform)
@@ -69,7 +71,7 @@ Fabric.
 **No single emulator's CI can verify the family.** entra's tests prove entra
 issues correct tokens; ARM's tests prove ARM validates *some* issuer. Neither
 proves that ARM validates *entra's* tokens, that the advertised issuer matches
-the one its peers check, or that the five images boot together in the right
+the one its peers check, or that the six images boot together in the right
 order. That cross-cutting proof has to live somewhere neutral — here.
 
 It also gives the family one canonical answer to "how do I run all of this?"
@@ -161,7 +163,7 @@ collides with a family stack you already have running.
 ## How much of Azure does the family emulate?
 
 Each emulator grades itself in its own `docs/parity.md` and binds every green
-row to a witness in `docs/witnesses.json`. To read all five at once:
+row to a witness in `docs/witnesses.json`. To read all six at once:
 
 ```sh
 ./scripts/family_parity.py              # both tables, markdown

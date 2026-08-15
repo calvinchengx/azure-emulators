@@ -24,9 +24,10 @@ So this test asserts the seam, not the semantics:
     6. fabric ACCEPTS a Fabric-audience token on /v1/workspaces.
     7. an ARM-created Microsoft.Fabric/capacities resource appears on
        fabric GET /v1/capacities (FABRIC_ARM_URL is wired, as KV_ARM_URL is).
-    8. a token from the WRONG issuer is refused by all three — proving steps
-       3-7 passed because the trust chain holds, not because validation is
-       absent.
+    8. databricks ACCEPTS its seeded PAT on /Me and refuses token=dev.
+    9. a token from the WRONG issuer is refused by arm, apim, fabric and
+       databricks — proving steps 3-8 passed because the trust chain holds,
+       not because validation is absent.
 
 Stdlib-only, like the family's other e2e scripts.
 
@@ -56,13 +57,14 @@ PORTS = {
     "ARM_PORT": os.environ.get("ARM_PORT", "18445"),
     "APIM_PORT": os.environ.get("APIM_PORT", "18446"),
     "FABRIC_PORT": os.environ.get("FABRIC_PORT", "19443"),
+    "DATABRICKS_PORT": os.environ.get("DATABRICKS_PORT", "18447"),
 }
 # BOTH profiles: the chain certifies the profiled consumers too, and a
 # profile left out is a member this test silently never covers. fabric was
 # exactly that — the largest image in the family, absent from the one check
 # that exists to prove the family composes.
 COMPOSE = ["docker", "compose", "-p", PROJECT,
-           "--profile", "apim", "--profile", "fabric",
+           "--profile", "apim", "--profile", "fabric", "--profile", "databricks",
            "-f", str(REPO / "docker-compose.yml")]
 # The compose file PERSISTS by default, which is what a human wants and the
 # opposite of what this test wants: a chain that inherits the previous run's
@@ -92,6 +94,7 @@ KV = f"https://localhost:{PORTS['KEYVAULT_PORT']}"
 ARM = f"https://localhost:{PORTS['ARM_PORT']}"
 APIM = f"https://localhost:{PORTS['APIM_PORT']}"
 FABRIC = f"https://localhost:{PORTS['FABRIC_PORT']}"
+DATABRICKS = f"https://localhost:{PORTS['DATABRICKS_PORT']}"
 ARM_API = "2021-04-01"
 APIM_API = "2024-05-01"
 KV_API = "7.5"
@@ -278,8 +281,35 @@ def main():
             sys.exit("FAIL: ARM-created capacity never appeared on GET /v1/capacities")
         step(7, f"fabric listed ARM-created capacity {seen}")
 
-        # 8. A token from the wrong issuer must be refused — otherwise steps
-        #    3-7 prove nothing about the trust chain.
+        # 8. Databricks identity is PAT-native. The seeded admin PAT is
+        #    printed once on first boot; token=dev is MiniLake's trap and
+        #    must stay 401. Entra is an optional federated issuer — this
+        #    step does not require a Databricks-audience token from entra.
+        logs = subprocess.check_output(
+            COMPOSE + ["logs", "databricks-emulator"], env=ENV, text=True
+        )
+        pat = ""
+        for line in logs.splitlines():
+            if "PAT:" in line:
+                pat = line.split("PAT:", 1)[1].strip()
+                break
+        if not pat:
+            sys.exit("FAIL: databricks never printed a seeded PAT")
+        status, raw = http(
+            "GET", f"{DATABRICKS}/api/2.0/preview/scim/v2/Me", bearer(pat)
+        )
+        me = json.loads(raw) if status == 200 else {}
+        if status != 200 or me.get("userName") != "admin":
+            sys.exit(f"FAIL: databricks PAT Me: {status} {raw[:300]}")
+        status, raw = http(
+            "GET", f"{DATABRICKS}/api/2.0/preview/scim/v2/Me", bearer("dev")
+        )
+        if status != 401:
+            sys.exit(f"FAIL: databricks accepted token=dev (HTTP {status})")
+        step(8, "databricks accepted the seeded PAT and refused token=dev")
+
+        # 9. A token from the wrong issuer must be refused — otherwise steps
+        #    3-8 prove nothing about the trust chain.
         bogus = (
             "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9."
             "eyJpc3MiOiJodHRwczovL2V2aWwuZXhhbXBsZS8iLCJhdWQiOiJodHRwczovL21hbmFnZW1lbnQuYXp1cmUuY29tIn0."
@@ -303,8 +333,13 @@ def main():
         status, _ = http("GET", f"{FABRIC}/v1/workspaces", bearer(bogus))
         if status != 401:
             sys.exit(f"FAIL: fabric accepted a foreign-issuer token (HTTP {status})")
-        step(8, "arm, apim and fabric rejected a foreign-issuer token (401) — "
-                "the gate is real")
+        status, _ = http(
+            "GET", f"{DATABRICKS}/api/2.0/preview/scim/v2/Me", bearer(bogus)
+        )
+        if status != 401:
+            sys.exit(f"FAIL: databricks accepted a foreign-issuer token (HTTP {status})")
+        step(9, "arm, apim, fabric and databricks rejected a foreign-issuer "
+                "token (401) — the gate is real")
 
     finally:
         if keep:

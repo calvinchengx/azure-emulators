@@ -92,7 +92,7 @@ function convert(name) {
 function writeIndex() {
   const body = rewriteLinks(
     `The Azure emulator family, composed. **This repo runs no emulator of its own** — ` +
-      `no binary, no image, no Go module. It is the neutral place where five ` +
+      `no binary, no image, no Go module. It is the neutral place where six ` +
       `independently released emulators are wired together, documented as a family, ` +
       `and *tested against each other*.
 
@@ -102,7 +102,9 @@ function writeIndex() {
 ` +
       `docker compose --profile fabric up   # …adds fabric
 ` +
-      `docker compose --profile apim up     # …adds apim
+      `docker compose --profile apim up         # …adds apim
+` +
+      `docker compose --profile databricks up   # …adds databricks
 ` +
       "```\n" +
       `
@@ -113,7 +115,7 @@ ARM governs the vault, as it does in Azure: role assignments decide who may ` +
       `:::note
 No single emulator's CI can verify the family. entra's tests prove entra issues ` +
       `correct tokens; ARM's prove ARM validates *some* issuer. Neither proves that ARM ` +
-      `validates *entra's* tokens, nor that the five images boot together in the right ` +
+      `validates *entra's* tokens, nor that the six images boot together in the right ` +
       `order. That cross-cutting proof has to live somewhere neutral — here.
 :::
 
@@ -146,6 +148,8 @@ No single emulator's CI can verify the family. entra's tests prove entra issues 
       `| fabric-emulator | [site](https://calvinchengx.github.io/fabric-emulator/) |
 ` +
       `| azure-apim-emulator | [site](https://calvinchengx.github.io/azure-apim-emulator/) |
+` +
+      `| databricks-emulator | [repo](https://github.com/calvinchengx/databricks-emulator) |
 `,
   );
   const frontmatter =

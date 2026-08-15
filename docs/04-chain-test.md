@@ -12,7 +12,7 @@ wired by this repo's compose file, actually trust each other.
 KEEP_UP=1 ./e2e/chain/run.py    # leave the stack up to poke at
 ```
 
-It runs under its own compose project on high ports (18443–18446), so it never
+It runs under its own compose project on high ports (18443–18447), so it never
 collides with a family stack you already have running. Stdlib-only Python,
 like the family's other e2e scripts.
 
@@ -25,11 +25,12 @@ like the family's other e2e scripts.
 5. **apim accepts the ARM-audience token** on its own management surface;
 6. **fabric accepts a Fabric-audience token** on `/v1/workspaces`;
 7. **an ARM-created Fabric capacity appears** on fabric `GET /v1/capacities`;
-8. a **foreign-issuer token is refused** — so steps 3–7 passed because the
+8. **databricks accepts its seeded PAT** on `/Me` and refuses `token=dev`;
+9. a **foreign-issuer token is refused** — so steps 3–8 passed because the
    trust chain holds, not because validation is absent.
 
-Step 8 is what makes the rest mean anything. Without it, an emulator that
-skipped validation entirely would sail through steps 3–7.
+Step 9 is what makes the rest mean anything. Without it, an emulator that
+skipped validation entirely would sail through steps 3–8.
 
 ## Reading a failure
 
@@ -57,6 +58,6 @@ token is its own repo's business, tested there in depth. What no other repo
 can prove is that the published images, composed together, still agree about
 who issues tokens and who trusts them.
 
-That failure mode is real and arrives from outside: any of the five can
+That failure mode is real and arrives from outside: any of the six can
 publish a release that breaks the family without a commit landing here. That
 is why the drift job runs [nightly](03-release-coordination.md).

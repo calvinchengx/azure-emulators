@@ -19,8 +19,9 @@ The consumers are profiled, because most callers do not need them and both
 images are large:
 
 ```sh
-docker compose --profile fabric up   # …adds fabric-emulator  :9443
-docker compose --profile apim up     # …adds apim-emulator    :8446
+docker compose --profile fabric up       # …adds fabric-emulator     :9443
+docker compose --profile apim up         # …adds apim-emulator       :8446
+docker compose --profile databricks up   # …adds databricks-emulator :8447
 ```
 
 ## Get a token and use it

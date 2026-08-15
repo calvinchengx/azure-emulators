@@ -1,6 +1,6 @@
 # 02 — The family
 
-Five emulators, each its own repo, its own release cadence, its own GHCR
+Six emulators, each its own repo, its own release cadence, its own GHCR
 image. This repo composes them and proves they still trust each other.
 
 | Emulator | Port | Role |
@@ -10,6 +10,7 @@ image. This repo composes them and proves they still trust each other.
 | [azure-keyvault-emulator](https://github.com/calvinchengx/azure-keyvault-emulator) | 8444 | Key Vault data plane — secrets, keys, certificates |
 | [fabric-emulator](https://github.com/calvinchengx/fabric-emulator) | 9443 | Fabric control plane + OneLake. A consumer — `fabric` profile |
 | [azure-apim-emulator](https://github.com/calvinchengx/azure-apim-emulator) | 8446 | API Management — management plane, gateway, policies. A consumer — `apim` profile |
+| [databricks-emulator](https://github.com/calvinchengx/databricks-emulator) | 8447 | Databricks workspace REST. PAT + its own OIDC; entra optional — `databricks` profile |
 
 ## Dependency order
 
@@ -20,10 +21,13 @@ graph LR
   kv[keyvault-emulator]
   fabric[fabric-emulator]
   apim[apim-emulator]
+  dbx[databricks-emulator]
   entra --> arm
   entra --> kv
   entra --> fabric
   entra --> apim
+  entra -.->|optional federated issuer| dbx
+  kv -.->|optional secret backend| dbx
   arm -->|governs| kv
 ```
 
@@ -39,7 +43,7 @@ Azure's resource providers each own their surface behind one front door.
 
 ## Why the boundary is real
 
-Each emulator is a static Go binary on distroless, so all five share one base
+Each emulator is a static Go binary on distroless, so all six share one base
 layer and cost a few tens of MB of RSS. Bundling them into one process would
 save essentially nothing — and would cost the thing that makes this family
 worth having: **keyvault and arm validating entra's tokens over HTTP against a

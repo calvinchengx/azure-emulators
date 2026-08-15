@@ -1,6 +1,6 @@
 # 03 — Release coordination
 
-Five independently released products that must work together. This is how the
+Six independently released products that must work together. This is how the
 family stays consistent without freezing anyone's cadence.
 
 ## The BOM
