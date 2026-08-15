@@ -70,6 +70,20 @@ resource then appears on `GET /v1/capacities`. Opt out the same way:
 FABRIC_ARM_URL= docker compose --profile fabric up
 ```
 
+Fabric Databricks activities (`DatabricksNotebook`, `DatabricksSparkPython`)
+submit to the sibling workspace only when `FABRIC_DATABRICKS_URL` is set.
+A bare `--profile fabric` does not depend on `--profile databricks`. The
+chain test scrapes databricks's seeded PAT and recreates fabric with:
+
+```sh
+FABRIC_DATABRICKS_URL=https://databricks-emulator:8447 \
+FABRIC_DATABRICKS_TOKEN=… \
+FABRIC_DATABRICKS_TLS_INSECURE=true \
+docker compose --profile fabric --profile databricks up
+```
+
+`token=dev` is 401 on databricks — never use it.
+
 ## Ports are overridable
 
 Every port is a variable, so the family can coexist with anything already

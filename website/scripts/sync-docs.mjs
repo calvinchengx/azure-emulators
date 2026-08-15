@@ -149,7 +149,7 @@ No single emulator's CI can verify the family. entra's tests prove entra issues 
 ` +
       `| azure-apim-emulator | [site](https://calvinchengx.github.io/azure-apim-emulator/) |
 ` +
-      `| databricks-emulator | [repo](https://github.com/calvinchengx/databricks-emulator) |
+      `| databricks-emulator | [site](https://calvinchengx.github.io/databricks-emulator/) |
 `,
   );
   const frontmatter =
