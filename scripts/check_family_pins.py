@@ -172,7 +172,15 @@ PINS = [
 # consumer pinning several images in ONE file: a file-level key waives every pin
 # in that file, including the ones still enforceable. contoso was the case that
 # forced it — three pins, two blocked, one current.
-WAIVERS = {}
+_FABRIC_ENTRA_08 = (
+    "fabric-emulator#250 pins entra 0.8.1 across compose files; 0.7.0 still "
+    "works (Databricks-audience is additive). Retire when that PR merges."
+)
+WAIVERS = {
+    ("fabric-emulator", "examples/fab-driven/.env", ENTRA_ENV): _FABRIC_ENTRA_08,
+    **{("fabric-emulator", path, ENTRA_IMAGE): _FABRIC_ENTRA_08
+       for path in FABRIC_COMPOSES},
+}
 
 
 def fetch(url):
