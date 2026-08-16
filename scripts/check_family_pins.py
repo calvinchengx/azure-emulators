@@ -74,6 +74,12 @@ FABRIC_IMAGE = r"fabric-emulator:\$\{FABRIC_EMULATOR_VERSION:-([\d.]+)\}"
 ENTRA_ENV = r"^ENTRA_EMULATOR_VERSION=([\d.]+)"
 KEYVAULT_ENV = r"^KEYVAULT_EMULATOR_VERSION=([\d.]+)"
 FABRIC_ENV = r"^FABRIC_EMULATOR_VERSION=([\d.]+)"
+# fabric's two COMPUTE SIDECARS. They are published by fabric's own release
+# workflow and tagged with fabric's release number, so they belong to the
+# FABRIC row of the BOM even though their variables are named for what they
+# contain rather than for the emulator.
+SAIL_ENV = r"^SAIL_VERSION=([\d.]+)"
+SPARK_AGENT_ENV = r"^SPARK_AGENT_VERSION=([\d.]+)"
 
 # Every fabric compose that stands an entra up. Listed rather than globbed
 # because this script reads the consumer over HTTP and cannot walk its tree; a
@@ -131,6 +137,23 @@ PINS = [
     ("contoso-fabric-platform", "versions.env", KEYVAULT_ENV, KEYVAULT, "error"),
     ("contoso-fabric-platform", "versions.env", ENTRA_ENV, ENTRA, "error"),
     ("contoso-fabric-platform", "versions.env", FABRIC_ENV, FABRIC, "error"),
+    # The same file's two COMPUTE SIDECAR pins, added 2026-08-16 after a bump
+    # that this gate passed while shipping a skew. fabric-emulator-sail and
+    # fabric-emulator-spark-agent are built by fabric's release workflow and
+    # tagged with fabric's release number, and versions.env says outright that
+    # they "move in lockstep" — but only FABRIC_EMULATOR_VERSION was watched,
+    # so bumping fabric alone left the stack running new API against old
+    # compute with every pin reporting green.
+    #
+    # That is the failure this gate exists to prevent, in the file it was
+    # written for: not a stale pin it reported, but a stale pin it could not
+    # see. Found by grepping versions.env for stragglers, not by the gate.
+    # Ordinary drift is survivable; this one is not, because the fabric
+    # 0.25.0 -> 0.27.0 range moved Sail to 0.7.0 with its paired Connect
+    # client and changed the shared agent's SQL handling, so the two halves
+    # disagree about the engine they are talking to.
+    ("contoso-fabric-platform", "versions.env", SAIL_ENV, FABRIC, "error"),
+    ("contoso-fabric-platform", "versions.env", SPARK_AGENT_ENV, FABRIC, "error"),
     # go.mod libraries: in-process entra for each repo's own tests. apim joins
     # here and NOT above: it publishes an image this BOM pins, but it consumes
     # no family image itself — it serves its own Microsoft.ApiManagement ARM
@@ -238,12 +261,28 @@ def fetch(url):
             time.sleep(3)
 
 
+def pin_label(pattern):
+    """The variable a pattern matches, for the report.
+
+    One file can hold several watched pins — contoso's versions.env holds five —
+    and `repo/path` alone cannot tell them apart. Before this, three stale pins
+    in one file printed three identical FAIL lines, which says something is
+    wrong without saying what to edit. The variable name is already in the
+    pattern; this lifts it out rather than making every entry carry a label by
+    hand, because a hand-written label is a second copy of a name that can
+    disagree with the regex beside it.
+    """
+    m = re.search(r"[A-Z][A-Z0-9_]{2,}", pattern)
+    return m.group(0) if m else None
+
+
 def evaluate(pins):
     """Return (errors, warnings) for a manifest. Split out of main() so the
     self-test can run the same code over a deliberately broken entry."""
     errors, warnings = [], []
     for repo, path, pattern, want, tier, globbed in expand(pins):
-        where = f"{repo}/{path}"
+        label = pin_label(pattern)
+        where = f"{repo}/{path}" + (f" ({label})" if label else "")
         try:
             text = fetch(RAW.format(repo=repo, path=path))
         except urllib.error.URLError as e:
@@ -297,6 +336,31 @@ def self_test():
         print(f"SELF-TEST FAIL: expected an 'unfetchable' error, got: {errors[0]}")
         return 1
     print(f"self-test ok: a missing repo is an error\n  {errors[0][:96]}")
+
+    # fabric's compute sidecars stay watched. Offline on purpose: this asserts
+    # the MANIFEST, not the network, so it cannot be skipped by an outage.
+    #
+    # Worth a permanent assertion rather than a one-off check, because the
+    # failure it guards against is invisible: delete these two rows and every
+    # run still says "All release pins match the BOM" while a consumer runs new
+    # fabric against old compute. A gate that cannot fail is indistinguishable
+    # from a gate that passes.
+    watched = {pin_label(p) for _, path, p, _, _ in PINS if path == "versions.env"}
+    for var in ("SAIL_VERSION", "SPARK_AGENT_VERSION"):
+        if var not in watched:
+            print(f"SELF-TEST FAIL: {var} is no longer watched in versions.env. "
+                  "It carries fabric's release number and moves in lockstep with "
+                  "FABRIC_EMULATOR_VERSION; unwatched, a bump ships a version skew "
+                  "with every pin reporting green.")
+            return 1
+    print("self-test ok: fabric's sail and spark-agent sidecars are watched")
+
+    # And the labels the report leans on actually resolve, or every FAIL in a
+    # multi-pin file becomes an unactionable duplicate line again.
+    if pin_label(SAIL_ENV) != "SAIL_VERSION" or pin_label(FABRIC_IMAGE) != "FABRIC_EMULATOR_VERSION":
+        print("SELF-TEST FAIL: pin_label no longer extracts the variable name.")
+        return 1
+    print("self-test ok: report labels resolve")
     return 0
 
 
