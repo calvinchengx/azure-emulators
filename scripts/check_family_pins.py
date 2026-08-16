@@ -5,7 +5,7 @@ The BOM is docker-compose.yml's version defaults — `${X_VERSION:-N.N.N}` —
 which certify one combination of released images. But the
 family consumes entra (and arm) through more channels than the image: keyvault's
 e2e runners `go install` a pinned release, fabric's fab-driven example pins an
-image tag of its own, contoso-data-platform pins the whole stack in a
+image tag of its own, contoso-fabric-platform pins the whole stack in a
 versions.env, and three repos link entra as a go.mod library for their
 in-process tests. A breaking upstream release has to land in ALL of them, and
 2026-08-08 showed what happens when it doesn't: keyvault was swept to a tenant
@@ -29,6 +29,7 @@ GitHub, and compares. Two tiers, deliberately different:
 Stdlib-only, like the family's other scripts.
 
     ./scripts/check_family_pins.py            # exit 1 on any ERROR-tier mismatch
+    ./scripts/check_family_pins.py --self-test  # prove a wrong repo name fails
 """
 
 import fnmatch
@@ -122,14 +123,14 @@ PINS = [
      r'"ARM_VERSION",\s*"(v[\d.]+)"', ARM, "error"),
     # fabric's fab-driven example pins entra's image the same way this repo does.
     ("fabric-emulator", "examples/fab-driven/.env", ENTRA_ENV, ENTRA, "error"),
-    # contoso-data-platform is a CONSUMER, not a family member: it is what a
+    # contoso-fabric-platform is a CONSUMER, not a family member: it is what a
     # reader writes from the published docs, and it runs the images rather than
     # building them. That makes it the one place family drift shows up as a
     # user would meet it — and until 2026-08-09 it was unwatched, which is how
     # its keyvault pin sat three releases behind without anything saying so.
-    ("contoso-data-platform", "versions.env", KEYVAULT_ENV, KEYVAULT, "error"),
-    ("contoso-data-platform", "versions.env", ENTRA_ENV, ENTRA, "error"),
-    ("contoso-data-platform", "versions.env", FABRIC_ENV, FABRIC, "error"),
+    ("contoso-fabric-platform", "versions.env", KEYVAULT_ENV, KEYVAULT, "error"),
+    ("contoso-fabric-platform", "versions.env", ENTRA_ENV, ENTRA, "error"),
+    ("contoso-fabric-platform", "versions.env", FABRIC_ENV, FABRIC, "error"),
     # go.mod libraries: in-process entra for each repo's own tests. apim joins
     # here and NOT above: it publishes an image this BOM pins, but it consumes
     # no family image itself — it serves its own Microsoft.ApiManagement ARM
@@ -237,9 +238,11 @@ def fetch(url):
             time.sleep(3)
 
 
-def main():
+def evaluate(pins):
+    """Return (errors, warnings) for a manifest. Split out of main() so the
+    self-test can run the same code over a deliberately broken entry."""
     errors, warnings = [], []
-    for repo, path, pattern, want, tier, globbed in expand(PINS):
+    for repo, path, pattern, want, tier, globbed in expand(pins):
         where = f"{repo}/{path}"
         try:
             text = fetch(RAW.format(repo=repo, path=path))
@@ -266,6 +269,41 @@ def main():
             else:
                 print(f"  ok    {where}: {pin}")
 
+    return errors, warnings
+
+
+def self_test():
+    """Prove the gate FAILS when a manifest entry points nowhere.
+
+    This rename is why the assertion is worth having. GitHub redirects renamed
+    repositories, so the stale `contoso-data-platform` entry kept answering 200
+    and the gate kept passing — the manifest named a repo that no longer
+    existed and nothing said so. The failure would have arrived whenever the
+    redirect lapsed, long after the change that caused it.
+
+    So the test that matters is not "the new name resolves" (the old one does
+    too, which is the problem). It is: does the gate still FAIL when a name is
+    genuinely wrong? Runs the real code path against a repo that cannot exist,
+    exercising the `unfetchable` branch rather than trusting that it works.
+    """
+    bogus = [("calvinchengx-no-such-repo-0000", "versions.env",
+              ENTRA_ENV, ENTRA, "error")]
+    errors, _ = evaluate(bogus)
+    if not errors:
+        print("SELF-TEST FAIL: a manifest entry pointing at a nonexistent repo "
+              "produced no error. The gate would silently pass a moved repo.")
+        return 1
+    if "unfetchable" not in errors[0]:
+        print(f"SELF-TEST FAIL: expected an 'unfetchable' error, got: {errors[0]}")
+        return 1
+    print(f"self-test ok: a missing repo is an error\n  {errors[0][:96]}")
+    return 0
+
+
+def main():
+    if "--self-test" in sys.argv:
+        return self_test()
+    errors, warnings = evaluate(PINS)
     for w in warnings:
         print(f"  WARN  {w}")
     for e in errors:
