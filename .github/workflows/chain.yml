@@ -91,6 +91,11 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
+      # Prove the gate can still fail before trusting that it passed. A
+      # manifest naming a moved repo kept passing on GitHub's rename redirect,
+      # so "it passed" and "it checked something" had come apart. No token
+      # needed: the self-test never reaches the network for a real repo.
+      - run: ./scripts/check_family_pins.py --self-test
       # The gate lists each globbed repo's files through the git-trees API.
       # Unauthenticated that is 60 requests/hour PER SOURCE IP, and Actions
       # runners share IPs, so without a token this check fails intermittently
