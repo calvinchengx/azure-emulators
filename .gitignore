@@ -5,3 +5,6 @@
 # compose file itself.
 .env
 node_modules/
+
+# Local tooling
+.nwave/
