@@ -91,4 +91,13 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
+      # The gate lists each globbed repo's files through the git-trees API.
+      # Unauthenticated that is 60 requests/hour PER SOURCE IP, and Actions
+      # runners share IPs, so without a token this check fails intermittently
+      # for a reason that has nothing to do with pins — which teaches readers
+      # to re-run it rather than read it. GITHUB_TOKEN raises the limit to
+      # 1,000/hour for this repo and needs no extra permission beyond the
+      # read-only contents scope already granted above.
       - run: ./scripts/check_family_pins.py
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
