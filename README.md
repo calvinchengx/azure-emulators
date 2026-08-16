@@ -17,7 +17,7 @@ Grok, Kimi K3, whichever agent is doing the work, build and prove the whole
 thing offline first, then move to a real tenant with no code changes: months
 of tenant-bound iteration becomes a day, or a week. See
 [fabric-emulator](https://github.com/calvinchengx/fabric-emulator) for the full
-argument, and [contoso-data-platform](https://github.com/calvinchengx/contoso-data-platform)
+argument, and [contoso-fabric-platform](https://github.com/calvinchengx/contoso-fabric-platform)
 for what it looks like end to end.
 
 ```sh
@@ -64,7 +64,7 @@ own release cadence. This repo pins and composes them.
 | `databricks-emulator` | 8447 | [databricks-emulator](https://github.com/calvinchengx/databricks-emulator) | Databricks workspace REST. Identity is PAT + its own OIDC; entra is an optional federated issuer. Behind a `databricks` profile |
 
 Not a service in this compose, but part of the family:
-[**contoso-data-platform**](https://github.com/calvinchengx/contoso-data-platform)
+[**contoso-fabric-platform**](https://github.com/calvinchengx/contoso-fabric-platform)
 is the fullest proof the family holds together under real use, four real vendor
 sources through a full medallion to a semantic model serving Power BI, running
 against a published `fabric-emulator` release and, with one flag, against real

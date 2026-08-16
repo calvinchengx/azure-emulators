@@ -5,7 +5,7 @@ The BOM is docker-compose.yml's version defaults — `${X_VERSION:-N.N.N}` —
 which certify one combination of released images. But the
 family consumes entra (and arm) through more channels than the image: keyvault's
 e2e runners `go install` a pinned release, fabric's fab-driven example pins an
-image tag of its own, contoso-data-platform pins the whole stack in a
+image tag of its own, contoso-fabric-platform pins the whole stack in a
 versions.env, and three repos link entra as a go.mod library for their
 in-process tests. A breaking upstream release has to land in ALL of them, and
 2026-08-08 showed what happens when it doesn't: keyvault was swept to a tenant
@@ -122,14 +122,14 @@ PINS = [
      r'"ARM_VERSION",\s*"(v[\d.]+)"', ARM, "error"),
     # fabric's fab-driven example pins entra's image the same way this repo does.
     ("fabric-emulator", "examples/fab-driven/.env", ENTRA_ENV, ENTRA, "error"),
-    # contoso-data-platform is a CONSUMER, not a family member: it is what a
+    # contoso-fabric-platform is a CONSUMER, not a family member: it is what a
     # reader writes from the published docs, and it runs the images rather than
     # building them. That makes it the one place family drift shows up as a
     # user would meet it — and until 2026-08-09 it was unwatched, which is how
     # its keyvault pin sat three releases behind without anything saying so.
-    ("contoso-data-platform", "versions.env", KEYVAULT_ENV, KEYVAULT, "error"),
-    ("contoso-data-platform", "versions.env", ENTRA_ENV, ENTRA, "error"),
-    ("contoso-data-platform", "versions.env", FABRIC_ENV, FABRIC, "error"),
+    ("contoso-fabric-platform", "versions.env", KEYVAULT_ENV, KEYVAULT, "error"),
+    ("contoso-fabric-platform", "versions.env", ENTRA_ENV, ENTRA, "error"),
+    ("contoso-fabric-platform", "versions.env", FABRIC_ENV, FABRIC, "error"),
     # go.mod libraries: in-process entra for each repo's own tests. apim joins
     # here and NOT above: it publishes an image this BOM pins, but it consumes
     # no family image itself — it serves its own Microsoft.ApiManagement ARM
