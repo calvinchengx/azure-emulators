@@ -31,6 +31,9 @@ Stdlib-only, like the family's other scripts.
     ./scripts/check_family_pins.py            # exit 1 on any ERROR-tier mismatch
 """
 
+import fnmatch
+import json
+import os
 import pathlib
 import re
 import sys
@@ -40,6 +43,7 @@ import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 RAW = "https://raw.githubusercontent.com/calvinchengx/{repo}/main/{path}"
+TREE = "https://api.github.com/repos/calvinchengx/{repo}/git/trees/main?recursive=1"
 
 # ---------------------------------------------------------------- the BOM ---
 # The compose file's interpolation defaults ARE the BOM: `${X_VERSION:-N.N.N}`.
@@ -77,18 +81,20 @@ FABRIC_ENV = r"^FABRIC_EMULATOR_VERSION=([\d.]+)"
 # examples/fab-driven is deliberately absent: its compose uses
 # ${ENTRA_EMULATOR_VERSION:?see .env}, so the pin lives in that .env, which is
 # already checked above. Checking both would double-report one pin.
-FABRIC_COMPOSES = (
-    "docker-compose.yml",
-    "e2e/notebook-run/docker-compose.jvm.yml",
-    *[f"e2e/{suite}/docker-compose.yml" for suite in (
-        "airflow", "azurite-shortcut", "data-science-loop", "dbt-fabric",
-        "dbt-fabricspark", "deployment-pipelines", "environment",
-        "external-shortcuts", "fabric-cli", "livy", "medallion",
-        "notebook-driven", "notebook-run", "rest-helix", "rest-servicenow",
-        "rti", "s3", "sail", "salesforce", "spark", "spark-jvm",
-        "vscode-extension",
-    )],
-)
+# Every compose file fabric ships, DISCOVERED rather than listed. This used to
+# be 24 hand-written paths, and a hand-written list fails in exactly one
+# direction: silently, the moment somebody adds a suite. It missed six files —
+# az-rest and the two conformance overlays had sat on entra 0.6.0 and 0.7.0
+# while the BOM moved to 0.8.1, and eventstream, terraform-fabric and
+# examples/fab-driven were correct only by luck, because nothing was checking.
+#
+# A glob covers a new suite the day it lands. The cost is one git-trees call
+# per globbed repo; GITHUB_TOKEN is used when present so CI does not spend the
+# unauthenticated rate limit.
+# NOT "**/…": fnmatch's * already crosses "/", so a leading "**/" only
+# forces at least one directory and would drop the ROOT docker-compose.yml
+# — the single most important file in the list it replaces.
+FABRIC_COMPOSES = ("*docker-compose*.yml",)
 
 PINS = [
     # keyvault's e2e runners `go install` these releases and run them.
@@ -148,6 +154,9 @@ PINS = [
     ("azure-keyvault-emulator", "docker-compose.yml", ARM_IMAGE, ARM, "error"),
     *[("fabric-emulator", path, ENTRA_IMAGE, ENTRA, "error")
       for path in FABRIC_COMPOSES],
+    # apim names its file compose.yaml, so every path above missed it and its
+    # entra pin sat on 0.4.1 while the BOM moved to 0.8.1.
+    ("azure-apim-emulator", "*compose*.y*ml", ENTRA_IMAGE, ENTRA, "error"),
     *[("fabric-emulator", path, KEYVAULT_IMAGE, KEYVAULT, "error")
       for path in ("docker-compose.yml", "e2e/medallion/docker-compose.yml")],
 ]
@@ -178,6 +187,45 @@ PINS = [
 WAIVERS = {}
 
 
+def tree_paths(repo, _cache={}):
+    """Every file path on the repo's main, from the git trees API."""
+    if repo in _cache:
+        return _cache[repo]
+    req = urllib.request.Request(TREE.format(repo=repo),
+                                 headers={"Accept": "application/vnd.github+json"})
+    token = os.environ.get("GITHUB_TOKEN")
+    if token:
+        req.add_header("Authorization", f"Bearer {token}")
+    with urllib.request.urlopen(req, timeout=20) as r:
+        data = json.load(r)
+    if data.get("truncated"):
+        raise SystemExit(f"{repo}: git tree came back truncated; the glob would "
+                         "silently under-report, which is the failure this replaced")
+    _cache[repo] = [e["path"] for e in data.get("tree", []) if e["type"] == "blob"]
+    return _cache[repo]
+
+
+def expand(pins):
+    """Turn glob paths into one entry per real file.
+
+    A globbed entry whose pattern is absent is NOT an error: a compose file
+    that pins no entra image simply is not about entra. An ENUMERATED entry
+    keeps the opposite rule, because there a missing pattern means the file
+    moved and the check has stopped checking.
+    """
+    out = []
+    for repo, path, pattern, want, tier in pins:
+        if "*" not in path:
+            out.append((repo, path, pattern, want, tier, False))
+            continue
+        matches = sorted(p for p in tree_paths(repo) if fnmatch.fnmatch(p, path))
+        if not matches:
+            raise SystemExit(f"{repo}: glob {path!r} matched no file — a glob that "
+                             "matches nothing checks nothing")
+        out.extend((repo, m, pattern, want, tier, True) for m in matches)
+    return out
+
+
 def fetch(url):
     for attempt in (1, 2):
         try:
@@ -191,7 +239,7 @@ def fetch(url):
 
 def main():
     errors, warnings = [], []
-    for repo, path, pattern, want, tier in PINS:
+    for repo, path, pattern, want, tier, globbed in expand(PINS):
         where = f"{repo}/{path}"
         try:
             text = fetch(RAW.format(repo=repo, path=path))
@@ -201,6 +249,8 @@ def main():
             continue
         found = re.findall(pattern, text, re.M)
         if not found:
+            if globbed:
+                continue
             (errors if tier == "error" else warnings).append(
                 f"{where}: pin pattern not found — fix the manifest in this script if it changed")
             continue
