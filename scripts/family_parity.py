@@ -30,10 +30,10 @@ Stdlib only, like the family's other scripts.
     ./scripts/family_parity.py --evidence   just the evidence behind the greens
     ./scripts/family_parity.py --local ..   read sibling checkouts instead of main
     ./scripts/family_parity.py entra        one member, in detail
-    ./scripts/family_parity.py --all        include emulators outside the family
+    ./scripts/family_parity.py --all        include adjacent-platform emulators
 
 The default set is exactly what this repo's BOM certifies. `--all` widens it to
-emulators built to the same discipline that are not Azure services, subtotalled
+adjacent-platform emulators — same discipline, not in the BOM — subtotalled
 separately so the family figure keeps meaning what it always meant. A member
 name always resolves, family or not.
 
@@ -65,12 +65,13 @@ FAMILY = [
 ]
 
 # Emulators built to the same discipline — a graded docs/parity.md, a witness
-# manifest, a checker enforcing both — that are NOT Azure services and so are
-# not in the BOM, the compose, or the pin gate. snowflake runs on Azure; it is
-# not part of it, and folding it into the family total would make that total
-# stop meaning "what this repo certifies". Shown only when asked for, and under
-# its own subtotal.
-BEYOND = [
+# manifest, a checker enforcing both — for platforms an Azure data estate talks
+# to rather than services Azure sells. They are not in the BOM, the compose, or
+# the pin gate, which is what actually separates them: snowflake runs on Azure
+# and Fabric mirrors it, so "not Azure" was never the useful line. Folding one
+# into the family total would make that total stop meaning "what this repo
+# certifies". Shown only when asked for, and under their own subtotal.
+ADJACENT = [
     ("snowflake-emulator", "snowflake"),
 ]
 
@@ -302,13 +303,13 @@ def _split(rows):
     """Family rows, then everything else, so the totals stay separable.
 
     The family subtotal must keep meaning "what this repo's BOM certifies".
-    Summing a non-Azure emulator into it would quietly redefine the one number
-    the rest of the repo is built around, so BEYOND members are subtotalled
-    apart and only an explicit `all` line adds them together.
+    Summing an uncertified emulator into it would quietly redefine the one
+    number the rest of the repo is built around, so ADJACENT members are
+    subtotalled apart and only an explicit `all` line adds them together.
     """
-    beyond = {s for _, s in BEYOND}
-    return ([r for r in rows if r[0] not in beyond],
-            [r for r in rows if r[0] in beyond])
+    adjacent = {s for _, s in ADJACENT}
+    return ([r for r in rows if r[0] not in adjacent],
+            [r for r in rows if r[0] in adjacent])
 
 
 def grades_table(rows, wide=False):
@@ -326,7 +327,7 @@ def grades_table(rows, wide=False):
     """
     out = ["| emulator | green | partial | not implemented | total | reached |",
            "|---|---:|---:|---:|---:|---:|"]
-    fam, beyond = _split(rows)
+    fam, adjacent = _split(rows)
 
     def row(short, g):
         n = g["green"] + g["amber"] + g["red"]
@@ -344,11 +345,11 @@ def grades_table(rows, wide=False):
     for short, g, _, _cov, _gaps in fam:
         out.append(row(short, g))
     out.append(subtotal("family", fam))
-    if beyond:
-        for short, g, _, _cov, _gaps in beyond:
+    if adjacent:
+        for short, g, _, _cov, _gaps in adjacent:
             out.append(row(short, g))
-        out.append(subtotal("beyond Azure", beyond))
-        out.append(subtotal("all emulators", fam + beyond))
+        out.append(subtotal("adjacent platforms", adjacent))
+        out.append(subtotal("all emulators", fam + adjacent))
     return "\n".join(out)
 
 
@@ -357,8 +358,8 @@ def evidence_table(rows, wide=False):
     out = ["| emulator | green claims | ci: external | sdk: only | own tests only | "
            "independently evidenced |",
            "|---|---:|---:|---:|---:|---:|"]
-    fam, beyond = _split(rows)
-    for short, _, _k, cov, _gaps in fam + beyond:
+    fam, adjacent = _split(rows)
+    for short, _, _k, cov, _gaps in fam + adjacent:
         total = cov["ci"] + cov["sdk"] + cov["own"]
         indep = cov["ci"] + cov["sdk"]
         share = f"{indep}/{total}" + (f" ({round(100 * indep / total)}%)" if total else "")
@@ -374,10 +375,10 @@ def main(argv):
         local = argv[i + 1] if i + 1 < len(argv) else ".."
     # A bare word is a member name: `family_parity.py entra`. Accepts the short
     # name or the repo name, so both `arm` and `arm-emulator` work.
-    # --all widens the set beyond the Azure family. A member NAME always
+    # --all widens the set to the adjacent platforms. A member NAME always
     # resolves, family or not: asking for `snowflake` by name is explicit, and
     # making it require a flag as well would be pedantry.
-    every = FAMILY + BEYOND
+    every = FAMILY + ADJACENT
     known = {s for _, s in every} | {r for r, _ in every}
     only = next((a for a in argv if not a.startswith("-") and a in known), None)
     stray = [a for a in argv if not a.startswith("-") and a not in known
