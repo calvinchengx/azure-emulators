@@ -30,6 +30,12 @@ Stdlib only, like the family's other scripts.
     ./scripts/family_parity.py --evidence   just the evidence behind the greens
     ./scripts/family_parity.py --local ..   read sibling checkouts instead of main
     ./scripts/family_parity.py entra        one member, in detail
+    ./scripts/family_parity.py --all        include emulators outside the family
+
+The default set is exactly what this repo's BOM certifies. `--all` widens it to
+emulators built to the same discipline that are not Azure services, subtotalled
+separately so the family figure keeps meaning what it always meant. A member
+name always resolves, family or not.
 
 A member name switches to a report the family table cannot carry: the same
 counts, plus every green claim that rests on our own client alone, by name.
@@ -47,8 +53,9 @@ import urllib.request
 
 RAW = "https://raw.githubusercontent.com/calvinchengx/{repo}/main/{path}"
 
-# Ordered by size of ledger, which is also roughly maturity.
-REPOS = [
+# The Azure family: exactly the set this repo's BOM certifies and its compose
+# stands up. Ordered by size of ledger, which is also roughly maturity.
+FAMILY = [
     ("fabric-emulator", "fabric"),
     ("entra-emulator", "entra"),
     ("azure-keyvault-emulator", "keyvault"),
@@ -56,6 +63,18 @@ REPOS = [
     ("arm-emulator", "arm"),
     ("databricks-emulator", "databricks"),
 ]
+
+# Emulators built to the same discipline — a graded docs/parity.md, a witness
+# manifest, a checker enforcing both — that are NOT Azure services and so are
+# not in the BOM, the compose, or the pin gate. snowflake runs on Azure; it is
+# not part of it, and folding it into the family total would make that total
+# stop meaning "what this repo certifies". Shown only when asked for, and under
+# its own subtotal.
+BEYOND = [
+    ("snowflake-emulator", "snowflake"),
+]
+
+REPOS = FAMILY
 
 # apim's word grades, mapped onto the family's three buckets. `sdk-verified`
 # and `implemented` are its green; `planned` is its red.
@@ -258,9 +277,9 @@ def member_report(short, grades, cov, gaps):
     return "\n".join(lines)
 
 
-def collect(local=None, only=None):
+def collect(local=None, only=None, repos=None):
     rows = []
-    for repo, short in REPOS:
+    for repo, short in (repos if repos is not None else REPOS):
         if only and only not in (short, repo):
             continue
         parity = fetch(repo, "docs/parity.md", local)
@@ -279,7 +298,20 @@ def collect(local=None, only=None):
     return rows
 
 
-def grades_table(rows):
+def _split(rows):
+    """Family rows, then everything else, so the totals stay separable.
+
+    The family subtotal must keep meaning "what this repo's BOM certifies".
+    Summing a non-Azure emulator into it would quietly redefine the one number
+    the rest of the repo is built around, so BEYOND members are subtotalled
+    apart and only an explicit `all` line adds them together.
+    """
+    beyond = {s for _, s in BEYOND}
+    return ([r for r in rows if r[0] not in beyond],
+            [r for r in rows if r[0] in beyond])
+
+
+def grades_table(rows, wide=False):
     """Green over the ledger's own total: progress against DECLARED scope.
 
     The denominator is what the repo set out to reach parity with, gaps
@@ -294,27 +326,39 @@ def grades_table(rows):
     """
     out = ["| emulator | green | partial | not implemented | total | reached |",
            "|---|---:|---:|---:|---:|---:|"]
-    tot = {"green": 0, "amber": 0, "red": 0}
-    for short, g, _, _cov, _gaps in rows:
-        for k in tot:
-            tot[k] += g[k]
+    fam, beyond = _split(rows)
+
+    def row(short, g):
         n = g["green"] + g["amber"] + g["red"]
         share = f"{round(100 * g['green'] / n)}%" if n else "-"
-        out.append(f"| {short} | {g['green']} | {g['amber']} | {g['red']} | {n} | "
-                   f"**{share}** |")
-    grand = sum(tot.values())
-    out.append(f"| **family** | **{tot['green']}** | **{tot['amber']}** | "
-               f"**{tot['red']}** | **{grand}** | "
-               f"**{round(100 * tot['green'] / grand)}%** |")
+        return (f"| {short} | {g['green']} | {g['amber']} | {g['red']} | {n} | "
+                f"**{share}** |")
+
+    def subtotal(label, group):
+        t = {k: sum(g[k] for _, g, _, _, _ in group) for k in ("green", "amber", "red")}
+        n = sum(t.values())
+        share = f"{round(100 * t['green'] / n)}%" if n else "-"
+        return (f"| **{label}** | **{t['green']}** | **{t['amber']}** | "
+                f"**{t['red']}** | **{n}** | **{share}** |")
+
+    for short, g, _, _cov, _gaps in fam:
+        out.append(row(short, g))
+    out.append(subtotal("family", fam))
+    if beyond:
+        for short, g, _, _cov, _gaps in beyond:
+            out.append(row(short, g))
+        out.append(subtotal("beyond Azure", beyond))
+        out.append(subtotal("all emulators", fam + beyond))
     return "\n".join(out)
 
 
-def evidence_table(rows):
+def evidence_table(rows, wide=False):
     """Claims, classified once each by their strongest witness."""
     out = ["| emulator | green claims | ci: external | sdk: only | own tests only | "
            "independently evidenced |",
            "|---|---:|---:|---:|---:|---:|"]
-    for short, _, _k, cov, _gaps in rows:
+    fam, beyond = _split(rows)
+    for short, _, _k, cov, _gaps in fam + beyond:
         total = cov["ci"] + cov["sdk"] + cov["own"]
         indep = cov["ci"] + cov["sdk"]
         share = f"{indep}/{total}" + (f" ({round(100 * indep / total)}%)" if total else "")
@@ -330,15 +374,23 @@ def main(argv):
         local = argv[i + 1] if i + 1 < len(argv) else ".."
     # A bare word is a member name: `family_parity.py entra`. Accepts the short
     # name or the repo name, so both `arm` and `arm-emulator` work.
-    known = {s for _, s in REPOS} | {r for r, _ in REPOS}
+    # --all widens the set beyond the Azure family. A member NAME always
+    # resolves, family or not: asking for `snowflake` by name is explicit, and
+    # making it require a flag as well would be pedantry.
+    every = FAMILY + BEYOND
+    known = {s for _, s in every} | {r for r, _ in every}
     only = next((a for a in argv if not a.startswith("-") and a in known), None)
     stray = [a for a in argv if not a.startswith("-") and a not in known
              and a != local]
     if stray:
-        print(f"unknown member {stray[0]!r}. Known: "
-              + ", ".join(sorted(s for _, s in REPOS)))
+        print(f"unknown emulator {stray[0]!r}. Known: "
+              + ", ".join(sorted(s for _, s in every)))
         return 2
-    rows = collect(local, only)
+    wide = "--all" in argv
+    repos = every if wide else FAMILY
+    if only:
+        repos = every
+    rows = collect(local, only, repos)
     if not rows:
         print("FAIL: no ledger could be read — network, or a repo moved its docs.")
         return 1
@@ -351,12 +403,12 @@ def main(argv):
     want_evidence = "--grades" not in argv
     if want_grades:
         print("## Parity grades\n")
-        print(grades_table(rows))
+        print(grades_table(rows, wide))
     if want_grades and want_evidence:
         print()
     if want_evidence:
         print("## Evidence behind the green rows\n")
-        print(evidence_table(rows))
+        print(evidence_table(rows, wide))
         print("\nEach claim is counted once, by its strongest witness. ci: a packaged "
               "external\nclient in CI. sdk: Microsoft's own client, in process. own: our "
               "client on both\nends, so our own reading of the contract.")
