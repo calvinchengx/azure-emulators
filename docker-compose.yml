@@ -200,7 +200,7 @@ services:
   # never starts or pulls.
   fabric-emulator:
     profiles: [fabric]
-    image: ghcr.io/calvinchengx/fabric-emulator:${FABRIC_EMULATOR_VERSION:-0.27.0}
+    image: ghcr.io/calvinchengx/fabric-emulator:${FABRIC_EMULATOR_VERSION:-0.28.0}
     depends_on:
       entra-emulator:
         condition: service_healthy
