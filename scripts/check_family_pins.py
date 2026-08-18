@@ -61,6 +61,7 @@ ENTRA = BOM["ENTRA_EMULATOR_VERSION"]
 ARM = BOM["ARM_EMULATOR_VERSION"]
 KEYVAULT = BOM["KEYVAULT_EMULATOR_VERSION"]
 FABRIC = BOM["FABRIC_EMULATOR_VERSION"]
+DATABRICKS = BOM["DATABRICKS_EMULATOR_VERSION"]
 
 # ------------------------------------------------------------- the sources --
 # (repo, path, regex, BOM version, tier). The regex's group(1) is the pin;
@@ -74,6 +75,7 @@ FABRIC_IMAGE = r"fabric-emulator:\$\{FABRIC_EMULATOR_VERSION:-([\d.]+)\}"
 ENTRA_ENV = r"^ENTRA_EMULATOR_VERSION=([\d.]+)"
 KEYVAULT_ENV = r"^KEYVAULT_EMULATOR_VERSION=([\d.]+)"
 FABRIC_ENV = r"^FABRIC_EMULATOR_VERSION=([\d.]+)"
+DATABRICKS_ENV = r"^DATABRICKS_EMULATOR_VERSION=([\d.]+)"
 # fabric's two COMPUTE SIDECARS. They are published by fabric's own release
 # workflow and tagged with fabric's release number, so they belong to the
 # FABRIC row of the BOM even though their variables are named for what they
@@ -129,14 +131,18 @@ PINS = [
      r'"ARM_VERSION",\s*"(v[\d.]+)"', ARM, "error"),
     # fabric's fab-driven example pins entra's image the same way this repo does.
     ("fabric-emulator", "examples/fab-driven/.env", ENTRA_ENV, ENTRA, "error"),
-    # contoso-fabric-platform is a CONSUMER, not a family member: it is what a
-    # reader writes from the published docs, and it runs the images rather than
-    # building them. That makes it the one place family drift shows up as a
+    # fabric-platform-notebook-pipelines (named contoso-fabric-platform until the
+    # platform repos were split by orchestrator) is a CONSUMER, not a family
+    # member: it is what a reader writes from the published docs, and it runs
+    # the images rather than building them. The old name still resolves through
+    # GitHub's rename redirect, which is precisely why it had to be changed
+    # here deliberately — a redirect is not a guarantee, and it lapses the day
+    # anything else claims that name. That makes it the one place family drift shows up as a
     # user would meet it — and until 2026-08-09 it was unwatched, which is how
     # its keyvault pin sat three releases behind without anything saying so.
-    ("contoso-fabric-platform", "versions.env", KEYVAULT_ENV, KEYVAULT, "error"),
-    ("contoso-fabric-platform", "versions.env", ENTRA_ENV, ENTRA, "error"),
-    ("contoso-fabric-platform", "versions.env", FABRIC_ENV, FABRIC, "error"),
+    ("fabric-platform-notebook-pipelines", "versions.env", KEYVAULT_ENV, KEYVAULT, "error"),
+    ("fabric-platform-notebook-pipelines", "versions.env", ENTRA_ENV, ENTRA, "error"),
+    ("fabric-platform-notebook-pipelines", "versions.env", FABRIC_ENV, FABRIC, "error"),
     # The same file's two COMPUTE SIDECAR pins, added 2026-08-16 after a bump
     # that this gate passed while shipping a skew. fabric-emulator-sail and
     # fabric-emulator-spark-agent are built by fabric's release workflow and
@@ -152,8 +158,24 @@ PINS = [
     # 0.25.0 -> 0.27.0 range moved Sail to 0.7.0 with its paired Connect
     # client and changed the shared agent's SQL handling, so the two halves
     # disagree about the engine they are talking to.
-    ("contoso-fabric-platform", "versions.env", SAIL_ENV, FABRIC, "error"),
-    ("contoso-fabric-platform", "versions.env", SPARK_AGENT_ENV, FABRIC, "error"),
+    ("fabric-platform-notebook-pipelines", "versions.env", SAIL_ENV, FABRIC, "error"),
+    ("fabric-platform-notebook-pipelines", "versions.env", SPARK_AGENT_ENV, FABRIC, "error"),
+    # databricks-platform-jobs, the Databricks-side twin of the platform above.
+    # Added with the 0.2.5 bump because the BOM's databricks row had NO consumer
+    # rule at all: every other row was cross-checked against somebody, so a
+    # stale databricks pin was the one kind of drift this gate structurally
+    # could not report. It sat at 0.2.4 against a released 0.2.5 and the run
+    # was green.
+    #
+    # It pins fabric's two compute sidecars as well, and against the FABRIC row
+    # rather than a databricks one — the engine emulator is Databricks, but the
+    # Spark underneath it is the one fabric's release workflow builds, so a
+    # fabric release moves this platform too.
+    ("databricks-platform-jobs", "versions.env", DATABRICKS_ENV, DATABRICKS, "error"),
+    ("databricks-platform-jobs", "versions.env", ENTRA_ENV, ENTRA, "error"),
+    ("databricks-platform-jobs", "versions.env", KEYVAULT_ENV, KEYVAULT, "error"),
+    ("databricks-platform-jobs", "versions.env", SAIL_ENV, FABRIC, "error"),
+    ("databricks-platform-jobs", "versions.env", SPARK_AGENT_ENV, FABRIC, "error"),
     # go.mod libraries: in-process entra for each repo's own tests. apim joins
     # here and NOT above: it publishes an image this BOM pins, but it consumes
     # no family image itself — it serves its own Microsoft.ApiManagement ARM
