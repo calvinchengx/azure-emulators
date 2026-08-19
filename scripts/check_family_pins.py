@@ -182,9 +182,12 @@ PINS = [
     # (SAIL_ENGINE_VERSION=0.7.0, SPARK_CLIENT_VERSION=4.2.0) where the two
     # platforms above pin the RELEASE number, so comparing either against the
     # FABRIC row would fail on a difference that is only a naming convention.
-    # Measured on ghcr before leaving them out: emulator-sail:0.7.0 and
-    # :0.29.0 are one image (sha256:b05e6913…), as are emulator-spark-agent
-    # :4.2.0 and :0.29.0 (sha256:ea08a534…). Same artifact, two tags — so there
+    # Measured on ghcr before leaving them out, re-measured at v0.30.0:
+    # emulator-sail:0.7.0 and :0.30.0 are one image (sha256:b35451c4…), as are
+    # emulator-spark-agent:4.2.0 and :0.30.0 (sha256:4264904d…). Both digests
+    # move on every fabric release even though neither tag does, so treat the
+    # values here as a dated sample and re-measure rather than trusting them.
+    # Same artifact, two tags — so there
     # is nothing here for a version-string rule to catch, and this repo pins by
     # DIGEST as well, which is the stronger check a string comparison cannot make.
     ("fabric-platform-airflow3", "versions.env", FABRIC_ENV, FABRIC, "error"),
