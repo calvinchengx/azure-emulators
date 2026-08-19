@@ -176,6 +176,19 @@ PINS = [
     ("databricks-platform-jobs", "versions.env", KEYVAULT_ENV, KEYVAULT, "error"),
     ("databricks-platform-jobs", "versions.env", SAIL_ENV, FABRIC, "error"),
     ("databricks-platform-jobs", "versions.env", SPARK_AGENT_ENV, FABRIC, "error"),
+    # fabric-platform-airflow3, the third platform and the last consumer nothing
+    # watched. Only two rows, and the omission is deliberate rather than partial:
+    # this repo pins fabric's compute sidecars by their COMPONENT version
+    # (SAIL_ENGINE_VERSION=0.7.0, SPARK_CLIENT_VERSION=4.2.0) where the two
+    # platforms above pin the RELEASE number, so comparing either against the
+    # FABRIC row would fail on a difference that is only a naming convention.
+    # Measured on ghcr before leaving them out: emulator-sail:0.7.0 and
+    # :0.29.0 are one image (sha256:b05e6913…), as are emulator-spark-agent
+    # :4.2.0 and :0.29.0 (sha256:ea08a534…). Same artifact, two tags — so there
+    # is nothing here for a version-string rule to catch, and this repo pins by
+    # DIGEST as well, which is the stronger check a string comparison cannot make.
+    ("fabric-platform-airflow3", "versions.env", FABRIC_ENV, FABRIC, "error"),
+    ("fabric-platform-airflow3", "versions.env", ENTRA_ENV, ENTRA, "error"),
     # go.mod libraries: in-process entra for each repo's own tests. apim joins
     # here and NOT above: it publishes an image this BOM pins, but it consumes
     # no family image itself — it serves its own Microsoft.ApiManagement ARM
