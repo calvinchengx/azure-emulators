@@ -144,8 +144,8 @@ PINS = [
     ("fabric-platform-notebook-pipelines", "versions.env", ENTRA_ENV, ENTRA, "error"),
     ("fabric-platform-notebook-pipelines", "versions.env", FABRIC_ENV, FABRIC, "error"),
     # The same file's two COMPUTE SIDECAR pins, added 2026-08-16 after a bump
-    # that this gate passed while shipping a skew. fabric-emulator-sail and
-    # fabric-emulator-spark-agent are built by fabric's release workflow and
+    # that this gate passed while shipping a skew. emulator-sail and
+    # emulator-spark-agent are built by fabric's release workflow and
     # tagged with fabric's release number, and versions.env says outright that
     # they "move in lockstep" — but only FABRIC_EMULATOR_VERSION was watched,
     # so bumping fabric alone left the stack running new API against old
