@@ -275,7 +275,7 @@ services:
   # backend. Opt in with `--profile databricks`.
   databricks-emulator:
     profiles: [databricks]
-    image: ghcr.io/calvinchengx/databricks-emulator:${DATABRICKS_EMULATOR_VERSION:-0.2.5}
+    image: ghcr.io/calvinchengx/databricks-emulator:${DATABRICKS_EMULATOR_VERSION:-0.2.6}
     depends_on:
       entra-emulator:
         condition: service_healthy
