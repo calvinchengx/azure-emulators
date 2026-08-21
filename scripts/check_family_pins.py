@@ -176,6 +176,18 @@ PINS = [
     ("databricks-platform-jobs", "versions.env", KEYVAULT_ENV, KEYVAULT, "error"),
     ("databricks-platform-jobs", "versions.env", SAIL_ENV, FABRIC, "error"),
     ("databricks-platform-jobs", "versions.env", SPARK_AGENT_ENV, FABRIC, "error"),
+    # databricks-platform-airflow3, added with the 0.2.9 bump because it was
+    # the consumer this gate could not see -- and it drifted exactly the way
+    # the unwatched always do: it sat on 0.2.7 while its twin moved to 0.2.9,
+    # and the six-day chain failure named only the twin. Its own set_release.py
+    # docstring records two earlier silent drifts for the same reason. One row
+    # only: its Sail and agent pins use fabric's RELEASE numbering (checked on
+    # ghcr: SAIL_VERSION=0.32.0 resolves as fabric-emulator-sail:0.32.0), but
+    # they live behind a compose that names sidecar DIGESTS this script cannot
+    # verify over HTTP, so watching the tag alone would claim more than it
+    # checks. The digests stay the platform's own responsibility, and its
+    # versions.env says so.
+    ("databricks-platform-airflow3", "versions.env", DATABRICKS_ENV, DATABRICKS, "error"),
     # fabric-platform-airflow3, the third platform and the last consumer nothing
     # watched. Only two rows, and the omission is deliberate rather than partial:
     # this repo pins fabric's compute sidecars by their COMPONENT version
