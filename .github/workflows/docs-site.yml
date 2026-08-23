@@ -5,10 +5,14 @@ on:
     branches: [main]
     paths:
       - 'docs/**'
+      - 'site/**'
       - 'website/**'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - 'package.json'
+      - 'docker-compose.yml'
+      - 'scripts/build_landing_data.py'
+      - 'scripts/family_parity.py'
       - '.github/workflows/docs-site.yml'
   # Pull requests build the site as a check, so a PR that breaks the docs
   # generator fails here rather than after merge. Build only: the deploy job
@@ -16,10 +20,14 @@ on:
   pull_request:
     paths:
       - 'docs/**'
+      - 'site/**'
       - 'website/**'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - 'package.json'
+      - 'docker-compose.yml'
+      - 'scripts/build_landing_data.py'
+      - 'scripts/family_parity.py'
       - '.github/workflows/docs-site.yml'
   workflow_dispatch:
 
@@ -63,10 +71,28 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter azure-emulators-docs build
 
+      # The published site is the landing page at the root with the rendered
+      # docs beneath it, so `/` is the family's front door and every chapter
+      # lives under /docs/. website/astro.config.mjs and sync-docs.mjs are
+      # based at /azure-emulators/docs/ to match.
+      - name: Assemble the site
+        run: |
+          rm -rf _site
+          mkdir -p _site
+          cp site/index.html _site/index.html
+          cp -R website/dist _site/docs
+      # The landing page states five totals and a version per member, and types
+      # none of them. This copies the manifests it reads and FAILS on a page
+      # that hardcodes one, so a stale headline is a red build rather than a
+      # quiet lie. It reads each member's published ledger over HTTP, the same
+      # way scripts/check_family_pins.py does.
+      - name: Landing page totals come from the manifests
+        run: python3 scripts/build_landing_data.py --out _site --landing site/index.html
+
       - uses: actions/upload-pages-artifact@v5
         if: github.event_name != 'pull_request'
         with:
-          path: website/dist
+          path: _site
 
   deploy:
     name: Deploy to GitHub Pages

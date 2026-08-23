@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Azure Emulators: the family, composed and tested against itself</title>
+<meta name="description" content="Six Azure emulators, each its own repo and image, pinned to one certified set and proved to still trust each other. This repo ships no emulator: it is the compose file, the bill of materials, and the chain test.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛓</text></svg>">
+<style>
+:root{
+  --bg:#fbfbfa; --panel:#fff; --ink:#16181d; --muted:#5c6270; --line:#e3e5e9;
+  --accent:#2a5db0; --accent-soft:#e8eef9;
+  --ship:#1f6f3f; --ship-bg:#e6f3ea;
+  --wip:#8a5a00; --wip-bg:#fdf3e0;
+  --plan:#5c6270; --plan-bg:#eef0f3;
+  --none:#a33a3a; --none-bg:#fbe9e9;
+  --code:#f4f5f7;
+  --radius:14px;
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#0f1115; --panel:#151920; --ink:#e8eaee; --muted:#98a0ae; --line:#262b34;
+    --accent:#7aa7ee; --accent-soft:#15223a;
+    --ship:#5fcf8a; --ship-bg:#112a1a;
+    --wip:#e0a94a; --wip-bg:#2a2114;
+    --plan:#98a0ae; --plan-bg:#1c212a;
+    --none:#e77f7f; --none-bg:#2e1616;
+    --code:#11151b;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);line-height:1.65;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1000px;margin:0 auto;padding:0 24px}
+a{color:var(--accent)}
+code{font-family:var(--mono);font-size:.9em;background:var(--code);padding:.15em .4em;border-radius:5px;overflow-wrap:anywhere}
+pre{background:var(--code);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;overflow-x:auto;font-family:var(--mono);font-size:.88rem;line-height:1.55}
+pre code{background:none;padding:0}
+h1,h2,h3{line-height:1.25;letter-spacing:-.02em}
+h2{font-size:1.7rem;margin:0 0 8px}
+.sec{padding:60px 0;border-top:1px solid var(--line)}
+.sec>.wrap>p.lede{color:var(--muted);font-size:1.05rem;max-width:70ch;margin:0 0 32px}
+
+/* nav */
+nav{border-bottom:1px solid var(--line);background:var(--bg)}
+nav .wrap{display:flex;align-items:center;justify-content:space-between;height:56px;gap:16px}
+nav .brand{font-family:var(--mono);font-size:.8rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink);text-decoration:none;font-weight:600}
+nav ul{list-style:none;display:flex;gap:22px;margin:0;padding:0;flex-wrap:wrap}
+nav li a{color:var(--muted);text-decoration:none;font-size:.9rem}
+nav li a.docs{color:var(--accent);font-weight:600}
+
+/* hero */
+.hero{padding:76px 0 64px}
+.eyebrow{font-family:var(--mono);font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin:0 0 18px}
+.hero h1{font-size:clamp(2.1rem,5.2vw,3.4rem);margin:0 0 20px;max-width:20ch}
+.hero p{font-size:1.12rem;color:var(--muted);max-width:66ch;margin:0 0 14px}
+.hero .claim{color:var(--ink);font-weight:600;border-left:3px solid var(--accent);padding-left:16px;margin-top:28px;max-width:62ch}
+.cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:32px}
+.btn{display:inline-block;padding:11px 20px;border-radius:10px;text-decoration:none;font-weight:600;font-size:.94rem;border:1px solid var(--line)}
+.btn.primary{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+.btn.ghost{color:var(--ink)}
+.release-pill{display:inline-flex;align-items:center;gap:9px;margin:0 0 20px;padding:6px 14px;border:1px solid var(--line);border-radius:999px;background:var(--panel);text-decoration:none;color:var(--muted);font-size:.86rem}
+.release-pill b{color:var(--ship);font-family:var(--mono);font-size:.8rem}
+
+/* stats */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;margin-top:40px}
+.stat{background:var(--panel);padding:20px 18px}
+.stat b{display:block;font-size:1.9rem;letter-spacing:-.03em;line-height:1}
+.stat b small{font-size:.9rem;color:var(--muted);margin-left:2px}
+.stat>span{display:block;color:var(--muted);font-size:.84rem;margin-top:6px}
+
+/* cards */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:22px 22px 18px;display:flex;flex-direction:column}
+.card h3{font-size:1.05rem;margin:0 0 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.card h3 a{text-decoration:none}
+.card p{margin:0 0 12px;color:var(--muted);font-size:.95rem}
+.card .ev{font-family:var(--mono);font-size:.78rem;color:var(--muted);border-top:1px solid var(--line);padding-top:10px;margin-top:auto;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.tag{font-family:var(--mono);font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:999px;font-weight:600}
+.t-ship{color:var(--ship);background:var(--ship-bg)}
+.t-wip{color:var(--wip);background:var(--wip-bg)}
+.t-plan{color:var(--plan);background:var(--plan-bg)}
+.t-none{color:var(--none);background:var(--none-bg)}
+
+/* problem */
+.three{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.three .card strong{display:block;color:var(--ink);margin-bottom:6px}
+.three .card .fix{color:var(--accent);font-size:.9rem;font-weight:600;margin-top:auto}
+
+/* honest */
+.honest{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--wip);border-radius:var(--radius);padding:22px 24px}
+.honest h3{margin:0 0 8px;font-size:1.05rem}
+.honest p{margin:0 0 10px;color:var(--muted)}
+.tiers{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;font-size:.92rem;margin:14px 0 0}
+.tiers code{white-space:nowrap;justify-self:start}
+
+footer{padding:40px 0;color:var(--muted);font-size:.86rem;border-top:1px solid var(--line)}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <a class="brand" href="#">Azure Emulators</a>
+  <ul>
+    <li><a href="#family">The family</a></li>
+    <li><a href="#get">Get it</a></li>
+    <li><a href="#run">Run it</a></li>
+    <li><a href="#honest">Status</a></li>
+    <li><a href="https://github.com/calvinchengx/azure-emulators">GitHub</a></li>
+    <li><a class="docs" href="docs/">Documentation &rarr;</a></li>
+  </ul>
+</div></nav>
+
+<section class="hero"><div class="wrap">
+  <p class="eyebrow">The Azure emulator family</p>
+  <a class="release-pill" href="https://github.com/calvinchengx/azure-emulators/blob/main/docker-compose.yml"><b id="bom-pinned">&mdash;</b> <span>images pinned to one certified set &rarr;</span></a>
+  <h1>The Azure control plane on your laptop, composed and tested against itself.</h1>
+  <p>Entra, ARM, Key Vault, Fabric, API Management and Databricks, each a separate emulator in its own repository with its own release cadence and its own container image. This repository is where they are wired together: one compose file, one pinned set of versions, and one test that proves the published images still trust each other.</p>
+  <p>Entra is the STS. It issues every token and publishes the JWKS the others validate against, over HTTP, across a real network boundary. That is the production trust relationship rather than a shortcut around it, which is why the family is six containers and not one process.</p>
+  <p>The point is speed for whoever, or whatever, is doing the work. Proving an Azure-shaped data platform against the real services costs a paid tenant and slow round trips that are hard to reset. Build and prove it here first, then point the issuer variables at a real tenant: that move is configuration, not a code path.</p>
+  <p class="claim">This repository ships no emulator of its own. No binary, no image, no Go module. It is the neutral place where the family is pinned, documented and proved, so no single member gets to grade the others.</p>
+  <div class="cta">
+    <a class="btn primary" href="docs/">Read the docs</a>
+    <a class="btn ghost" href="#family">The six emulators</a>
+    <a class="btn ghost" href="#run">Run the family</a>
+    <a class="btn ghost" href="#honest">Honest status</a>
+  </div>
+  <div class="stats">
+    <div class="stat"><b id="member-count">&mdash;</b><span>emulators, each its own repo, release and image</span></div>
+    <div class="stat"><b><span id="green-count">&mdash;</span><small>/<span id="graded-count">&mdash;</span></small></b><span>capabilities graded green across the family ledgers</span></div>
+    <div class="stat"><b id="evidenced-count">&mdash;</b><span>of those proved by a client we did not write</span></div>
+    <div class="stat"><b id="chain-steps">&mdash;</b><span>assertions the chain test makes on released images</span></div>
+    <div class="stat"><b id="verified-count">&mdash;</b><span>green claims carrying a witness from real Azure</span></div>
+  </div>
+</div></section>
+
+<section class="sec"><div class="wrap">
+  <h2>The problem this repository solves</h2>
+  <p class="lede">Every member already tests itself, thoroughly, from its own source tree. None of them can test the family, and the family is where the interesting failure lives.</p>
+  <div class="three">
+    <div class="card"><strong>No member's CI can verify the family</strong>
+      <p>Entra's suite proves entra issues correct tokens. ARM's suite proves ARM validates <em>some</em> issuer. Neither proves that ARM validates <em>entra's</em> tokens, or that the six images boot together in the right order.</p>
+      <p class="fix">A chain test over the published images, in a neutral repo</p></div>
+    <div class="card"><strong>The issuer mismatch fails silently</strong>
+      <p>Tokens carry <code>iss = &lt;entra origin&gt;/&lt;tenant&gt;/v2.0</code>, so entra must advertise the origin its peers check. Get it wrong and every cross-service call returns <code>401</code> while every upstream suite stays green.</p>
+      <p class="fix">One <code>PUBLIC_ORIGIN</code>, repeated verbatim, and asserted</p></div>
+    <div class="card"><strong>Six release cadences, one working set</strong>
+      <p>Any member can publish a release that breaks the family without a commit landing here. That arrives from outside, at a time nobody chose, and the first symptom is somebody else's broken afternoon.</p>
+      <p class="fix">A pinned bill of materials, plus a nightly run against <code>latest</code> to catch the drift</p></div>
+  </div>
+</div></section>
+
+<section class="sec" id="family"><div class="wrap">
+  <h2>The six emulators</h2>
+  <p class="lede">Each has its own documentation site, its own parity ledger and its own witness manifest. The version on each card is the one this repository's chain test certified; the grade is what that repository's own gate reports, not a second opinion computed here.</p>
+  <div class="grid">
+    <div class="card" data-member="entra-emulator">
+      <h3><a href="https://calvinchengx.github.io/entra-emulator/">entra-emulator</a> <span class="tag t-ship">the STS</span></h3>
+      <p>Issues every token in the family and publishes the JWKS the others validate against: OAuth 2.0 and OpenID Connect, Graph, SCIM. Upstream of everything, and the only hard dependency.</p>
+      <div class="ev"><span>port <span data-port="entra-emulator">&mdash;</span> &middot; <span data-grade="entra-emulator">&mdash;</span></span><span data-version="entra-emulator">&mdash;</span></div></div>
+    <div class="card" data-member="arm-emulator">
+      <h3><a href="https://calvinchengx.github.io/arm-emulator/">arm-emulator</a> <span class="tag t-ship">control plane</span></h3>
+      <p>The Azure Resource Manager control plane with <code>Microsoft.Authorization</code> RBAC. It governs the vault the way Azure does: a role assignment decides who may read a secret, and no assignment means no access.</p>
+      <div class="ev"><span>port <span data-port="arm-emulator">&mdash;</span> &middot; <span data-grade="arm-emulator">&mdash;</span></span><span data-version="arm-emulator">&mdash;</span></div></div>
+    <div class="card" data-member="azure-keyvault-emulator">
+      <h3><a href="https://calvinchengx.github.io/azure-keyvault-emulator/">azure-keyvault-emulator</a> <span class="tag t-ship">data plane</span></h3>
+      <p>The Key Vault data plane: secrets, keys and certificates, authenticated by entra's tokens and authorized by ARM's role assignments, both over the network rather than in process.</p>
+      <div class="ev"><span>port <span data-port="azure-keyvault-emulator">&mdash;</span> &middot; <span data-grade="azure-keyvault-emulator">&mdash;</span></span><span data-version="azure-keyvault-emulator">&mdash;</span></div></div>
+    <div class="card" data-member="fabric-emulator">
+      <h3><a href="https://calvinchengx.github.io/fabric-emulator/">fabric-emulator</a> <span class="tag t-wip">consumer</span></h3>
+      <p>The Fabric control plane and OneLake: workspaces, items, pipelines and the lakehouse surfaces. A consumer of the three above, and the largest ledger in the family. Behind the <code>fabric</code> profile because the image is heavy.</p>
+      <div class="ev"><span>port <span data-port="fabric-emulator">&mdash;</span> &middot; <span data-grade="fabric-emulator">&mdash;</span></span><span data-version="fabric-emulator">&mdash;</span></div></div>
+    <div class="card" data-member="azure-apim-emulator">
+      <h3><a href="https://calvinchengx.github.io/azure-apim-emulator/">azure-apim-emulator</a> <span class="tag t-wip">consumer</span></h3>
+      <p>API Management: the management plane, the gateway, and the policy engine with its C# expression language. A consumer of entra alone, serving its own <code>Microsoft.ApiManagement</code> surface rather than calling ARM. Behind the <code>apim</code> profile.</p>
+      <div class="ev"><span>port <span data-port="azure-apim-emulator">&mdash;</span> &middot; <span data-grade="azure-apim-emulator">&mdash;</span></span><span data-version="azure-apim-emulator">&mdash;</span></div></div>
+    <div class="card" data-member="databricks-emulator">
+      <h3><a href="https://calvinchengx.github.io/databricks-emulator/">databricks-emulator</a> <span class="tag t-wip">consumer</span></h3>
+      <p>The Databricks workspace REST surface. Identity is a personal access token plus its own OIDC; entra is an optional federated issuer and the vault an optional secret backend. Behind the <code>databricks</code> profile.</p>
+      <div class="ev"><span>port <span data-port="databricks-emulator">&mdash;</span> &middot; <span data-grade="databricks-emulator">&mdash;</span></span><span data-version="databricks-emulator">&mdash;</span></div></div>
+  </div>
+  <p style="color:var(--muted);margin-top:22px">A grade counts rows in that repository's <code>docs/parity.md</code>, whose denominator is the scope that repository set out to reach. It moves when discovery adds a row, and it cannot see surface nobody has enumerated yet. Each ledger states separately, under its scope boundary, what it leaves out and why.</p>
+</div></section>
+
+<section class="sec" id="honest"><div class="wrap">
+  <h2>Honest status</h2>
+  <p class="lede">Every number on this page is read from a manifest when the page loads. None is typed into it, and the build fails if one ever is.</p>
+  <div class="honest">
+    <h3>What is proved, and by what</h3>
+    <p>Across the family, <b id="green-count-2">&mdash;</b> capabilities are graded green, <b id="partial-count">&mdash;</b> are partial, and <b id="red-count">&mdash;</b> are enumerated as not implemented. A red row is a stated absence rather than a silence, which is the only reason the denominator means anything.</p>
+    <p>A green row must name a witness in that repository's <code>docs/witnesses.json</code>, and its CI fails when a named witness stops existing. The witnesses are ranked, and this page counts each claim once, by its strongest one.</p>
+    <div class="tiers">
+      <code>ci:</code><span>a packaged third-party client driving the emulator over a network in CI. The strongest tier.</span>
+      <code>sdk:</code><span>Microsoft's own client does the talking, linked into a test in process.</span>
+      <code>go:</code><span>our own client on both ends. It proves the emulator agrees with itself, which is not nothing and is not evidence.</span>
+      <code>verified</code><span>compared against a running Azure tenant. <b id="verified-sentence">&mdash;</b></span>
+    </div>
+    <p style="margin-top:16px">So <b id="evidenced-count-2">&mdash;</b> of the green claims rest on a client we did not write, and the rest on ours. None of them is graded on a comparison with Azure itself: no claim in any member's ledger carries a <code>verified</code> witness, which is why that tile reads <b id="verified-count-2">&mdash;</b>. entra comes closest, having captured six token-endpoint scenarios from a real tenant and diffing them offline. apim and fabric carry differential harnesses that have never run, for want of a tenant and its credentials. That is the honest ceiling on everything above.</p>
+    <p>The chain test is narrower still, on purpose. Its <b id="chain-steps-2">&mdash;</b> assertions prove the seam: that the published images agree about who issues tokens and who trusts them. What each service does with a valid token is its own repository's business, tested there in depth. One of the assertions offers a foreign-issuer token and requires a refusal, because without it an emulator that skipped validation entirely would pass every other step.</p>
+  </div>
+</div></section>
+
+<section class="sec" id="get"><div class="wrap">
+  <h2>Get it</h2>
+  <p class="lede">There is nothing to install but Docker. This repository is a compose file, a bill of materials and a test; the images come from GHCR.</p>
+<pre><code>git clone https://github.com/calvinchengx/azure-emulators
+cd azure-emulators
+docker compose up</code></pre>
+  <p>That is entra, ARM and Key Vault, wired to each other and governed the way Azure governs. The version defaults in the compose file are the bill of materials: a bare <code>docker compose up</code> runs the newest combination this repository's chain test has proved works together. Each is overridable per variable, so pinning one member back is a one-line change and never a fork.</p>
+</div></section>
+
+<section class="sec" id="run"><div class="wrap">
+  <h2>Run it</h2>
+  <p class="lede">The consumers are profiled, because most callers do not need them and both images are large.</p>
+<pre><code>docker compose --profile fabric up       # …adds fabric-emulator     :9443
+docker compose --profile apim up         # …adds apim-emulator       :8446
+docker compose --profile databricks up   # …adds databricks-emulator :8447</code></pre>
+  <p>State persists in named volumes, so a directory you seed once is still there tomorrow. <code>docker compose down</code> keeps it; <code>docker compose down -v</code> is the deliberate reset.</p>
+  <p>To run the family's own gate over the pinned images, on high ports so it never collides with a stack you already have up:</p>
+<pre><code>./e2e/chain/run.py              # runs the certified versions, then tears down
+KEEP_UP=1 ./e2e/chain/run.py    # leave the stack up to poke at</code></pre>
+  <p>Then follow the <a href="docs/01-quickstart/">quickstart</a> for a token and a first call, <a href="docs/02-the-family/">the family</a> for how the six depend on each other, <a href="docs/03-release-coordination/">release coordination</a> for how a bump is certified, and <a href="docs/04-chain-test/">the chain test</a> for what each assertion means when it fails.</p>
+</div></section>
+
+<footer><div class="wrap">
+  Clean-room: every member is built from Microsoft's public documentation, SDKs and REST contracts, never from decompiled binaries. Nothing here is Microsoft's code, and nothing here is affiliated with or endorsed by Microsoft. A capability is graded only in a member's own parity ledger; this page adds them up and never grades anything itself.
+</div></footer>
+
+<script>
+(function () {
+  function text(id, value) { var el = document.getElementById(id); if (el) { el.textContent = value; } }
+  function slots(attr, member, value) {
+    var found = document.querySelectorAll('[' + attr + '="' + member + '"]');
+    for (var i = 0; i < found.length; i++) { found[i].textContent = value; }
+  }
+  function get(name) {
+    return fetch(name).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; });
+  }
+
+  // The bill of materials, parsed from docker-compose.yml at build time. The
+  // versions are the certified set, so a BOM bump moves this page without
+  // anyone editing it. That is the only way it stays true, since a bump is a
+  // one-line pull request that will never think to look here.
+  get('family-bom.json').then(function (d) {
+    if (!d || !d.members) { return; }
+    text('member-count', d.count);
+    text('bom-pinned', d.pinned);
+    d.members.forEach(function (m) {
+      slots('data-version', m.repo, m.version);
+      slots('data-port', m.repo, m.port);
+    });
+  });
+
+  // Each member's own ledger, read through scripts/family_parity.py, which
+  // applies that repo's own checker's skip list. A number here that disagreed
+  // with the member's own gate would be worse than no number.
+  get('family-parity.json').then(function (d) {
+    if (!d || !d.totals) { return; }
+    var t = d.totals;
+    text('green-count', t.green);
+    text('green-count-2', t.green);
+    text('graded-count', t.total);
+    text('partial-count', t.amber);
+    text('red-count', t.red);
+    text('evidenced-count', t.evidenced);
+    text('evidenced-count-2', t.evidenced);
+    text('verified-count', d.verified);
+    text('verified-count-2', d.verified);
+    text('verified-sentence', d.verified
+      ? d.verified + ' claims carry it.'
+      : 'No claim in the family carries it yet.');
+    Object.keys(d.members).forEach(function (repo) {
+      var m = d.members[repo];
+      slots('data-grade', repo, m.green + ' of ' + m.total + ' green');
+    });
+  });
+
+  get('chain-assertions.json').then(function (d) {
+    if (!d || typeof d.assertions !== 'number') { return; }
+    text('chain-steps', d.assertions);
+    text('chain-steps-2', d.assertions);
+  });
+}());
+</script>
+</body>
+</html>

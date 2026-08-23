@@ -3,13 +3,15 @@ import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import { remarkMermaid } from './plugins/remark-mermaid.mjs';
 
-// Published to GitHub Pages under /azure-emulators/, so every generated link
-// needs that base. Docs content is generated from /docs by
-// scripts/sync-docs.mjs before build — /docs stays the single source of truth,
-// and its files keep working as plain Markdown on GitHub.
+// Published to GitHub Pages under /azure-emulators/docs/, so every generated
+// link needs that base. The root of the site is the landing page in /site,
+// which the docs-site workflow copies above this build; the docs live one
+// level down so `/` is the family's front door. Docs content is generated from
+// /docs by scripts/sync-docs.mjs before build, so /docs stays the single
+// source of truth and its files keep working as plain Markdown on GitHub.
 export default defineConfig({
   site: 'https://calvinchengx.github.io',
-  base: '/azure-emulators/',
+  base: '/azure-emulators/docs/',
   markdown: { remarkPlugins: [remarkMermaid] },
   integrations: [
     starlight({
