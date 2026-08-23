@@ -24,8 +24,31 @@ name: Family chain
 on:
   push:
     branches: [main]
+    paths:
+      # Prose changes do not need the suite. This is `paths` with negations
+      # rather than `paths-ignore`, because paths-ignore cannot re-include
+      # anything and docs/generated must be: those files are gates, not docs.
+      #
+      # The last matching pattern wins, so the re-include sits after every
+      # exclusion. '*.md' is separate because '**/*.md' needs a directory and
+      # does not match the root README.
+      - '**'
+      - '!docs/**'
+      - '!website/**'
+      - '!site/**'
+      - '!*.md'
+      - '!**/*.md'
+      - 'docs/generated/**'
   pull_request:
     branches: [main]
+    paths:
+      - '**'
+      - '!docs/**'
+      - '!website/**'
+      - '!site/**'
+      - '!*.md'
+      - '!**/*.md'
+      - 'docs/generated/**'
   schedule:
     - cron: '17 6 * * *' # daily, 06:17 UTC — catches upstream :latest drift
   workflow_dispatch:
