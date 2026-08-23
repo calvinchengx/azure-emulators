@@ -4,7 +4,7 @@
 
 ## Documentation
 
-- [Quickstart](https://calvinchengx.github.io/azure-emulators/01-quickstart/): The whole family, one command. Nothing to install but Docker.
-- [The family](https://calvinchengx.github.io/azure-emulators/02-the-family/): Six emulators, each its own repo, its own release cadence, its own GHCR image. This repo composes them and proves they still trust each other.
-- [Release coordination](https://calvinchengx.github.io/azure-emulators/03-release-coordination/): Six independently released products that must work together. This is how the family stays consistent without freezing anyone's cadence.
-- [The chain test](https://calvinchengx.github.io/azure-emulators/04-chain-test/): The one check no single emulator's repo can make.
+- [Quickstart](https://calvinchengx.github.io/azure-emulators/docs/01-quickstart/): The whole family, one command. Nothing to install but Docker.
+- [The family](https://calvinchengx.github.io/azure-emulators/docs/02-the-family/): Six emulators, each its own repo, its own release cadence, its own GHCR image. This repo composes them and proves they still trust each other.
+- [Release coordination](https://calvinchengx.github.io/azure-emulators/docs/03-release-coordination/): Six independently released products that must work together. This is how the family stays consistent without freezing anyone's cadence.
+- [The chain test](https://calvinchengx.github.io/azure-emulators/docs/04-chain-test/): The one check no single emulator's repo can make.
