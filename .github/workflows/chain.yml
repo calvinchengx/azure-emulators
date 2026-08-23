@@ -80,9 +80,13 @@ jobs:
 
   certified:
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    # BOTH conditions, in one key. The docs gate was added above the schedule
+    # condition this job already carried, and two `if:` keys make the file
+    # invalid: GitHub reports "a workflow file issue" and runs NOTHING, which
+    # is how the BOM's own certification gate went dark for two hours without
+    # a single failing check to show for it.
+    if: needs.changes.outputs.docs_only != 'true' && github.event_name != 'schedule'
     name: The BOM composes and trusts itself
-    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest # Docker + compose preinstalled
     timeout-minutes: 25
     steps:
@@ -103,9 +107,8 @@ jobs:
 
   drift:
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: needs.changes.outputs.docs_only != 'true' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     name: Does :latest still compose? (nightly)
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
