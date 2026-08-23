@@ -6,6 +6,10 @@ on:
     paths:
       - 'docs/**'
       - 'site/**'
+      - 'scripts/assemble_site.py'
+      - 'scripts/build_landing_data.py'
+      - 'website/published-routes.txt'
+      - 'Makefile'
       - 'website/**'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
@@ -21,6 +25,10 @@ on:
     paths:
       - 'docs/**'
       - 'site/**'
+      - 'scripts/assemble_site.py'
+      - 'scripts/build_landing_data.py'
+      - 'website/published-routes.txt'
+      - 'Makefile'
       - 'website/**'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
@@ -68,26 +76,20 @@ jobs:
         with:
           node-version: '22'
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter azure-emulators-docs build
-
-      # The published site is the landing page at the root with the rendered
-      # docs beneath it, so `/` is the family's front door and every chapter
-      # lives under /docs/. website/astro.config.mjs and sync-docs.mjs are
-      # based at /azure-emulators/docs/ to match.
-      - name: Assemble the site
-        run: |
-          rm -rf _site
-          mkdir -p _site
-          cp site/index.html _site/index.html
-          cp -R website/dist _site/docs
-      # The landing page states five totals and a version per member, and types
-      # none of them. This copies the manifests it reads and FAILS on a page
-      # that hardcodes one, so a stale headline is a red build rather than a
-      # quiet lie. It reads each member's published ledger over HTTP, the same
-      # way scripts/check_family_pins.py does.
-      - name: Landing page totals come from the manifests
-        run: python3 scripts/build_landing_data.py --out _site --landing site/index.html
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.11.32"
+      # ONE STEP, AND IT IS THE ONE A DEVELOPER RUNS. `make docs-serve` builds
+      # with this same target and then serves the result at the paths it
+      # publishes under, so what is previewed locally is what deploys from
+      # here. Spelling the sequence out in YAML instead is how the two drift:
+      # the local recipe is the one nobody updates, and it is also the only one
+      # anyone looks at before pushing.
+      #
+      # What it runs is documented at the target in the Makefile. In short: the
+      # Starlight build, the assembler with its pre-move route oracle and its
+      # self-test, and the landing page, which Astro never sees.
+      - run: make docs-build
 
       - uses: actions/upload-pages-artifact@v5
         if: github.event_name != 'pull_request'
