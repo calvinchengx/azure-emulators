@@ -5,7 +5,6 @@ on:
     branches: [main]
     paths:
       - 'docs/**'
-      - 'site/**'
       - 'website/**'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
@@ -20,7 +19,6 @@ on:
   pull_request:
     paths:
       - 'docs/**'
-      - 'site/**'
       - 'website/**'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
@@ -79,15 +77,18 @@ jobs:
         run: |
           rm -rf _site
           mkdir -p _site
-          cp site/index.html _site/index.html
+          # ONE BUILD OUTPUT AT BOTH DOORS. The landing page is
+          # website/src/pages/index.astro now, so it arrives in dist/ with
+          # the docs and there is no second file to keep in step.
           cp -R website/dist _site/docs
+          cp website/dist/index.html _site/index.html
       # The landing page states five totals and a version per member, and types
       # none of them. This copies the manifests it reads and FAILS on a page
       # that hardcodes one, so a stale headline is a red build rather than a
       # quiet lie. It reads each member's published ledger over HTTP, the same
       # way scripts/check_family_pins.py does.
       - name: Landing page totals come from the manifests
-        run: python3 scripts/build_landing_data.py --out _site --landing site/index.html
+        run: python3 scripts/build_landing_data.py --out _site --landing website/src/pages/index.astro
 
       - uses: actions/upload-pages-artifact@v5
         if: github.event_name != 'pull_request'

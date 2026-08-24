@@ -1,3 +1,23 @@
+---
+// The landing page, as an Astro page rather than a hand-written file.
+//
+// WHY IT MOVED. It used to be site/index.html, copied to the site root by the
+// docs-site workflow and seen by nothing else -- not the Astro build, not
+// `astro dev`, not a single check that protects the docs. fabric-emulator ran
+// the two-surface version and its assembler records how it ended: a
+// hand-written root page and an Astro page under /docs/ drifted until the
+// version pill read "unreleased" on a repository with 33 tags.
+//
+// THE RULE THAT MAKES ONE FILE CORRECT AT TWO DEPTHS: nothing here may be
+// page-relative. This file is served at /azure-emulators/ AND at
+// /azure-emulators/docs/, so `href="docs/01-quickstart/"` resolves to two
+// different places and is wrong at one of them.
+//
+//   base -- where the DOCS live:    /azure-emulators/docs/
+//   root -- where the SITE root is: /azure-emulators/
+const base = import.meta.env.BASE_URL;
+const root = base.replace(/docs\/$/, "");
+---
 <!doctype html>
 <html lang="en">
 <head>
@@ -115,6 +135,9 @@ nav li a.docs{color:var(--accent);font-weight:600}
 .family-group .you{font-size:.68rem;text-transform:uppercase;letter-spacing:.07em;
   color:var(--muted);margin-top:2px}
 footer{padding:40px 0;color:var(--muted);font-size:.86rem;border-top:1px solid var(--line)}
+.chapters{list-style:none;padding:0;display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.chapters a{display:block;padding:12px 14px;border:1px solid var(--line,#e3e5e9);border-radius:10px;text-decoration:none}
+.chapters b{display:block}
 </style>
 </head>
 <body>
@@ -127,7 +150,7 @@ footer{padding:40px 0;color:var(--muted);font-size:.86rem;border-top:1px solid v
     <li><a href="#run">Run it</a></li>
     <li><a href="#honest">Status</a></li>
     <li><a href="https://github.com/calvinchengx/azure-emulators">GitHub</a></li>
-    <li><a class="docs" href="docs/">Documentation &rarr;</a></li>
+    <li><a class="docs" href="#docs">Documentation &rarr;</a></li>
   </ul>
 </div></nav>
 
@@ -140,7 +163,7 @@ footer{padding:40px 0;color:var(--muted);font-size:.86rem;border-top:1px solid v
   <p>The point is speed for whoever, or whatever, is doing the work. Proving an Azure-shaped data platform against the real services costs a paid tenant and slow round trips that are hard to reset. Build and prove it here first, then point the issuer variables at a real tenant: that move is configuration, not a code path.</p>
   <p class="claim">This repository ships no emulator of its own. No binary, no image, no Go module. It is the neutral place where the family is pinned, documented and proved, so no single member gets to grade the others.</p>
   <div class="cta">
-    <a class="btn primary" href="docs/">Read the docs</a>
+    <a class="btn primary" href={`${base}01-quickstart/`}>Read the docs</a>
     <a class="btn ghost" href="#family">The six emulators</a>
     <a class="btn ghost" href="#run">Run the family</a>
     <a class="btn ghost" href="#honest">Honest status</a>
@@ -239,8 +262,27 @@ docker compose --profile databricks up   # …adds databricks-emulator :8447</co
   <p>To run the family's own gate over the pinned images, on high ports so it never collides with a stack you already have up:</p>
 <pre><code>./e2e/chain/run.py              # runs the certified versions, then tears down
 KEEP_UP=1 ./e2e/chain/run.py    # leave the stack up to poke at</code></pre>
-  <p>Then follow the <a href="docs/01-quickstart/">quickstart</a> for a token and a first call, <a href="docs/02-the-family/">the family</a> for how the six depend on each other, <a href="docs/03-release-coordination/">release coordination</a> for how a bump is certified, and <a href="docs/04-chain-test/">the chain test</a> for what each assertion means when it fails.</p>
+  <p>Then follow the <a href={`${base}01-quickstart/`}>quickstart</a> for a token and a first call, <a href={`${base}02-the-family/`}>the family</a> for how the six depend on each other, <a href={`${base}03-release-coordination/`}>release coordination</a> for how a bump is certified, and <a href={`${base}04-chain-test/`}>the chain test</a> for what each assertion means when it fails.</p>
 </div></section>
+
+
+<section id="docs">
+  <div class="wrap">
+    <h2>Documentation</h2>
+    <!-- THE CURATED INDEX LIVES HERE NOW. This page IS the docs root: it is
+         served at /azure-emulators/ and at /azure-emulators/docs/ from one
+         build output, so a generated index.md would have claimed that second
+         route. Keeping both is the arrangement fabric-emulator had, where two
+         surfaces for one page drifted until one advertised a release that did
+         not exist. -->
+    <ul class="chapters">
+    <li><a href={`${base}01-quickstart/`}><b>Quickstart</b> &mdash; the whole family in one command</a></li>
+    <li><a href={`${base}02-the-family/`}><b>The family</b> &mdash; who the members are, and why the boundary between them is real</a></li>
+    <li><a href={`${base}03-release-coordination/`}><b>Release coordination</b> &mdash; the BOM, the three consumption channels, and the ordering rule</a></li>
+    <li><a href={`${base}04-chain-test/`}><b>The chain test</b> &mdash; the one check no single repo can make</a></li>
+    </ul>
+  </div>
+</section>
 
 <footer><div class="wrap">
   Clean-room: every member is built from Microsoft's public documentation, SDKs and REST contracts, never from decompiled binaries. Nothing here is Microsoft's code, and nothing here is affiliated with or endorsed by Microsoft. A capability is graded only in a member's own parity ledger; this page adds them up and never grades anything itself.

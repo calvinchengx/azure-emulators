@@ -24,8 +24,8 @@ Three manifests, three different repos-worth of truth:
                        one number disagree eventually and the page loses.
   docs/04-chain-test.md  how many assertions the chain actually makes.
 
-    ./scripts/build_landing_data.py --out _site --landing site/index.html
-    ./scripts/build_landing_data.py --out _site --landing site/index.html \
+    ./scripts/build_landing_data.py --out _site --landing website/src/pages/index.astro
+    ./scripts/build_landing_data.py --out _site --landing website/src/pages/index.astro \
         --local ..     # sibling checkouts instead of the published main
 """
 

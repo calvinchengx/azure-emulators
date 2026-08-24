@@ -149,79 +149,13 @@ function convert(name) {
   return frontmatter + body;
 }
 
-function writeIndex() {
-  const body = rewriteLinks(
-    `The Azure emulator family, composed. **This repo runs no emulator of its own** — ` +
-      `no binary, no image, no Go module. It is the neutral place where six ` +
-      `independently released emulators are wired together, documented as a family, ` +
-      `and *tested against each other*.
-
-` +
-      "```sh\n" +
-      `docker compose up            # entra + arm + keyvault
-` +
-      `docker compose --profile fabric up   # …adds fabric
-` +
-      `docker compose --profile apim up         # …adds apim
-` +
-      `docker compose --profile databricks up   # …adds databricks
-` +
-      "```\n" +
-      `
-ARM governs the vault, as it does in Azure: role assignments decide who may ` +
-      `read a secret, and **no assignment means no access**.
-
-` +
-      `:::note
-No single emulator's CI can verify the family. entra's tests prove entra issues ` +
-      `correct tokens; ARM's prove ARM validates *some* issuer. Neither proves that ARM ` +
-      `validates *entra's* tokens, nor that the six images boot together in the right ` +
-      `order. That cross-cutting proof has to live somewhere neutral — here.
-:::
-
-` +
-      `## Start here
-
-` +
-      `- [Quickstart](01-quickstart.md) — the whole family in one command
-` +
-      `- [The family](02-the-family.md) — who the members are, and why the boundary between them is real
-` +
-      `- [Release coordination](03-release-coordination.md) — the BOM, the three consumption channels, and the ordering rule
-` +
-      `- [The chain test](04-chain-test.md) — the one check no single repo can make
-
-` +
-      `## The members
-
-` +
-      `| Emulator | Docs |
-` +
-      `|---|---|
-` +
-      `| entra-emulator | [site](https://calvinchengx.github.io/entra-emulator/) |
-` +
-      `| arm-emulator | [site](https://calvinchengx.github.io/arm-emulator/) |
-` +
-      `| azure-keyvault-emulator | [site](https://calvinchengx.github.io/azure-keyvault-emulator/) |
-` +
-      `| fabric-emulator | [site](https://calvinchengx.github.io/fabric-emulator/) |
-` +
-      `| azure-apim-emulator | [site](https://calvinchengx.github.io/azure-apim-emulator/) |
-` +
-      `| databricks-emulator | [site](https://calvinchengx.github.io/databricks-emulator/) |
-`,
-  );
-  const frontmatter =
-    `---
-title: Azure Emulators
-description: The Azure emulator family, composed — entra, ARM, Key Vault, Fabric and API Management, pinned to a certified set and tested against each other.
-editUrl: false
----
-
-`;
-  writeFileSync(join(OUT, 'index.md'), frontmatter + body);
-}
+// NO writeIndex() ANY MORE, and this note is here so its absence reads as a
+// decision rather than an omission.
+//
+// The docs root is `website/src/pages/index.astro` -- the landing page, served
+// at the site root AND at the docs base from one build output. An index.md
+// here would have claimed that second route. Its curated chapter list moved
+// onto that page, under #docs.
 
 
 // ---------------------------------------------------------------------------
@@ -262,6 +196,5 @@ const names = readdirSync(DOCS_SRC).filter((n) => DOC_RE.test(n)).sort();
 for (const name of names) {
   writeFileSync(join(OUT, name), convert(name));
 }
-writeIndex();
 const llms = writeLlms(entries);
 console.log(`sync-docs: wrote ${names.length} docs + index to src/content/docs/`);

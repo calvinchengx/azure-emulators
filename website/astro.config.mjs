@@ -29,7 +29,7 @@ export default defineConfig({
       sidebar: [
         {
           label: 'Getting started',
-          items: [{ slug: 'index' }, { slug: '01-quickstart' }],
+          items: [{ slug: '01-quickstart' }],
         },
         {
           label: 'The family',
