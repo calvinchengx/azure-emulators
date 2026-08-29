@@ -10,8 +10,8 @@
     "preview": "astro preview"
   },
   "dependencies": {
-    "@astrojs/starlight": "0.41.7",
-    "astro": "7.2.3",
+    "@astrojs/starlight": "0.41.9",
+    "astro": "7.2.7",
     "mermaid": "^11.16.1",
     "sharp": "0.35.3",
     "unist-util-visit": "^5.1.0"
