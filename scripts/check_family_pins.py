@@ -80,8 +80,17 @@ DATABRICKS_ENV = r"^DATABRICKS_EMULATOR_VERSION=([\d.]+)"
 # workflow and tagged with fabric's release number, so they belong to the
 # FABRIC row of the BOM even though their variables are named for what they
 # contain rather than for the emulator.
-SAIL_ENV = r"^SAIL_VERSION=([\d.]+)"
-SPARK_AGENT_ENV = r"^SPARK_AGENT_VERSION=([\d.]+)"
+# THE VARIABLES WERE RENAMED, AND THIS WENT BLIND RATHER THAN RED. The
+# consumers split one ambiguous name into three: SAIL_ENGINE_VERSION is the
+# Sail a consumer gets (0.7.0), SAIL_ENGINE_DIGEST is the image identity, and
+# SAIL_ENGINE_RELEASE is the fabric release it shipped in. The old
+# `SAIL_VERSION=` stopped matching anything, so two pins were reported as
+# "pin pattern not found" -- unchecked, not merely mismatched.
+#
+# `_RELEASE` is the right field to watch and a better one than before: it says
+# the fabric release explicitly, where the old tag only implied it.
+SAIL_ENV = r"^SAIL_ENGINE_RELEASE=([\d.]+)"
+SPARK_AGENT_ENV = r"^SPARK_CLIENT_RELEASE=([\d.]+)"
 
 # Every fabric compose that stands an entra up. Listed rather than globbed
 # because this script reads the consumer over HTTP and cannot walk its tree; a
@@ -204,6 +213,13 @@ PINS = [
     # DIGEST as well, which is the stronger check a string comparison cannot make.
     ("fabric-platform-airflow3", "versions.env", FABRIC_ENV, FABRIC, "error"),
     ("fabric-platform-airflow3", "versions.env", ENTRA_ENV, ENTRA, "error"),
+    # ITS SIDECARS ARE CHECKABLE NOW. The omission above was correct while this
+    # repo pinned them only by component version (0.7.0, 4.2.0), which no string
+    # rule could compare against a fabric release. It carries SAIL_ENGINE_RELEASE
+    # and SPARK_CLIENT_RELEASE as well now, and those say the release outright,
+    # so the reason for leaving them out has gone.
+    ("fabric-platform-airflow3", "versions.env", SAIL_ENV, FABRIC, "error"),
+    ("fabric-platform-airflow3", "versions.env", SPARK_AGENT_ENV, FABRIC, "error"),
     # go.mod libraries: in-process entra for each repo's own tests. apim joins
     # here and NOT above: it publishes an image this BOM pins, but it consumes
     # no family image itself — it serves its own Microsoft.ApiManagement ARM
@@ -395,8 +411,15 @@ def self_test():
     # run still says "All release pins match the BOM" while a consumer runs new
     # fabric against old compute. A gate that cannot fail is indistinguishable
     # from a gate that passes.
+    #
+    # The two names are read off the pattern constants rather than written out
+    # again. Spelling them a second time is what just broke: the consumers
+    # renamed the variables, SAIL_ENV stopped matching, and this assertion went
+    # on passing because it was comparing two stale literals to each other. It
+    # still catches what it was built to catch, a deleted PINS row, because
+    # `watched` comes from PINS.
     watched = {pin_label(p) for _, path, p, _, _ in PINS if path == "versions.env"}
-    for var in ("SAIL_VERSION", "SPARK_AGENT_VERSION"):
+    for var in (pin_label(SAIL_ENV), pin_label(SPARK_AGENT_ENV)):
         if var not in watched:
             print(f"SELF-TEST FAIL: {var} is no longer watched in versions.env. "
                   "It carries fabric's release number and moves in lockstep with "
@@ -407,7 +430,7 @@ def self_test():
 
     # And the labels the report leans on actually resolve, or every FAIL in a
     # multi-pin file becomes an unactionable duplicate line again.
-    if pin_label(SAIL_ENV) != "SAIL_VERSION" or pin_label(FABRIC_IMAGE) != "FABRIC_EMULATOR_VERSION":
+    if pin_label(SAIL_ENV) != "SAIL_ENGINE_RELEASE" or pin_label(FABRIC_IMAGE) != "FABRIC_EMULATOR_VERSION":
         print("SELF-TEST FAIL: pin_label no longer extracts the variable name.")
         return 1
     print("self-test ok: report labels resolve")
