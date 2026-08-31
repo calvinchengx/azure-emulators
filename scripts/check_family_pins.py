@@ -411,8 +411,15 @@ def self_test():
     # run still says "All release pins match the BOM" while a consumer runs new
     # fabric against old compute. A gate that cannot fail is indistinguishable
     # from a gate that passes.
+    #
+    # The two names are read off the pattern constants rather than written out
+    # again. Spelling them a second time is what just broke: the consumers
+    # renamed the variables, SAIL_ENV stopped matching, and this assertion went
+    # on passing because it was comparing two stale literals to each other. It
+    # still catches what it was built to catch, a deleted PINS row, because
+    # `watched` comes from PINS.
     watched = {pin_label(p) for _, path, p, _, _ in PINS if path == "versions.env"}
-    for var in ("SAIL_VERSION", "SPARK_AGENT_VERSION"):
+    for var in (pin_label(SAIL_ENV), pin_label(SPARK_AGENT_ENV)):
         if var not in watched:
             print(f"SELF-TEST FAIL: {var} is no longer watched in versions.env. "
                   "It carries fabric's release number and moves in lockstep with "
@@ -423,7 +430,7 @@ def self_test():
 
     # And the labels the report leans on actually resolve, or every FAIL in a
     # multi-pin file becomes an unactionable duplicate line again.
-    if pin_label(SAIL_ENV) != "SAIL_VERSION" or pin_label(FABRIC_IMAGE) != "FABRIC_EMULATOR_VERSION":
+    if pin_label(SAIL_ENV) != "SAIL_ENGINE_RELEASE" or pin_label(FABRIC_IMAGE) != "FABRIC_EMULATOR_VERSION":
         print("SELF-TEST FAIL: pin_label no longer extracts the variable name.")
         return 1
     print("self-test ok: report labels resolve")
