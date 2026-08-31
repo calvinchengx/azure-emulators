@@ -183,6 +183,10 @@ def coverage(manifest, green_keys):
     has been proved by something other than our own client, so each claim is
     classified once, by its STRONGEST witness:
 
+      diff  a response recorded from the REAL service and compared field by
+            field. The only tier that evidences parity: ci: proves an
+            unmodified client accepted us, never that Azure would have
+            answered the same way.
       ci    a packaged external client in CI, over a network
       sdk   Microsoft's own client, linked into a test in process
       own   our client on both ends, which is our reading of the contract
@@ -190,14 +194,16 @@ def coverage(manifest, green_keys):
     Counted the other way round, entra's 14 citations looked like progress on a
     51-claim ledger; 14 of 51 claims covered is the number that shows the gap.
     """
-    tiers = {"ci": 0, "sdk": 0, "own": 0}
+    tiers = {"diff": 0, "ci": 0, "sdk": 0, "own": 0}
     entries = manifest.get("claims", manifest) if isinstance(manifest, dict) else {}
     for key, val in entries.items():
         if key.startswith("_") or key.startswith("$") or key not in green_keys:
             continue
         witnesses = val.get("witnesses", []) if isinstance(val, dict) else val
         kinds = {w.partition(":")[0] for w in witnesses if isinstance(witnesses, list)}
-        if "ci" in kinds:
+        if "diff" in kinds:
+            tiers["diff"] += 1
+        elif "ci" in kinds:
             tiers["ci"] += 1
         elif "sdk" in kinds:
             tiers["sdk"] += 1
@@ -244,15 +250,15 @@ def uncovered(manifest, green_keys):
             continue
         witnesses = val.get("witnesses", []) if isinstance(val, dict) else val
         witnesses = witnesses if isinstance(witnesses, list) else []
-        if not {w.partition(":")[0] for w in witnesses} & {"ci", "sdk"}:
+        if not {w.partition(":")[0] for w in witnesses} & {"diff", "ci", "sdk"}:
             out.append((key, witnesses))
     return sorted(out)
 
 
 def member_report(short, grades, cov, gaps):
     """One emulator, in the same table shape as the family view."""
-    total = cov["ci"] + cov["sdk"] + cov["own"]
-    indep = cov["ci"] + cov["sdk"]
+    total = cov["diff"] + cov["ci"] + cov["sdk"] + cov["own"]
+    indep = cov["diff"] + cov["ci"] + cov["sdk"]
     pct = f" ({round(100 * indep / total)}%)" if total else ""
     lines = [
         f"## {short}\n",
@@ -261,10 +267,10 @@ def member_report(short, grades, cov, gaps):
         f"| {grades['green']} | {grades['amber']} | {grades['red']} | "
         f"{grades['green'] + grades['amber'] + grades['red']} |",
         "",
-        "| green claims | ci: external | sdk: only | own tests only | "
+        "| green claims | diff: vs real | ci: external | sdk: only | own tests only | "
         "independently evidenced |",
-        "|---:|---:|---:|---:|---:|",
-        f"| {total} | {cov['ci']} | {cov['sdk']} | {cov['own']} | "
+        "|---:|---:|---:|---:|---:|---:|",
+        f"| {total} | {cov['diff']} | {cov['ci']} | {cov['sdk']} | {cov['own']} | "
         f"**{indep}/{total}{pct}** |",
     ]
     if gaps:
@@ -355,15 +361,15 @@ def grades_table(rows, wide=False):
 
 def evidence_table(rows, wide=False):
     """Claims, classified once each by their strongest witness."""
-    out = ["| emulator | green claims | ci: external | sdk: only | own tests only | "
-           "independently evidenced |",
-           "|---|---:|---:|---:|---:|---:|"]
+    out = ["| emulator | green claims | diff: vs real | ci: external | sdk: only | "
+           "own tests only | independently evidenced |",
+           "|---|---:|---:|---:|---:|---:|---:|"]
     fam, adjacent = _split(rows)
     for short, _, _k, cov, _gaps in fam + adjacent:
-        total = cov["ci"] + cov["sdk"] + cov["own"]
-        indep = cov["ci"] + cov["sdk"]
+        total = cov["diff"] + cov["ci"] + cov["sdk"] + cov["own"]
+        indep = cov["diff"] + cov["ci"] + cov["sdk"]
         share = f"{indep}/{total}" + (f" ({round(100 * indep / total)}%)" if total else "")
-        out.append(f"| {short} | {total} | {cov['ci']} | {cov['sdk']} | "
+        out.append(f"| {short} | {total} | {cov['diff']} | {cov['ci']} | {cov['sdk']} | "
                    f"{cov['own']} | **{share}** |")
     return "\n".join(out)
 
