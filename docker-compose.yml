@@ -251,7 +251,7 @@ services:
   # 8446; inside the network the two never collide (different containers).
   apim-emulator:
     profiles: [apim]
-    image: ghcr.io/calvinchengx/azure-apim-emulator:${APIM_EMULATOR_VERSION:-0.3.0}
+    image: ghcr.io/calvinchengx/azure-apim-emulator:${APIM_EMULATOR_VERSION:-0.5.0}
     depends_on:
       entra-emulator:
         condition: service_healthy
