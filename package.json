@@ -10,5 +10,10 @@
     "preinstall": "npx only-allow pnpm",
     "docs:dev": "pnpm --filter azure-emulators-docs dev",
     "docs:build": "pnpm --filter azure-emulators-docs build"
+  },
+  "pnpm": {
+    "overrides": {
+      "lodash-es": "^4.18.1"
+    }
   }
 }
