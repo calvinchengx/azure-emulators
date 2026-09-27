@@ -13,17 +13,38 @@ seeded object is found with the right shape, not merely that a query ran.
 
 RisingWave 3.1.0, `openmetadata-ingestion` 2.0.2.0, PostgreSQL 17.11 as control.
 
-**The connector cannot catalog RisingWave, and exactly two missing functions
-are why.** Reading the columns of any table or materialized view fails:
+**The connector cannot catalog RisingWave, because of three gaps in
+RisingWave's Postgres compatibility.** Reading the columns of any table or
+materialized view fails:
 
-1. The connector's column query calls `json_build_object`. RisingWave has only
-   `jsonb_build_object`.
-2. SQLAlchemy's domain lookup, which the connector's `get_columns` calls, uses
+1. The connector's identity-column subquery (`POSTGRES_COL_IDENTITY`) calls
+   `json_build_object`. RisingWave has only `jsonb_build_object`.
+2. The same subquery casts to `oid` (`::regclass::oid`). RisingWave has no
+   `oid` type.
+3. SQLAlchemy's domain lookup, which the connector's `get_columns` calls, uses
    `pg_collation_is_visible`, which RisingWave lacks.
 
-With both skipped (`what_if.py`), every required check passes on RisingWave,
-including lineage: OpenMetadata's parser reads RisingWave's view and
-materialized view definitions and finds the right source tables and columns.
+Everything else the connector needs works, including lineage: OpenMetadata's
+parser reads RisingWave's view and materialized view definitions and finds the
+right source tables and columns.
+
+**Two small changes close the gap.** Simulated exactly on RisingWave 3.1.0 and
+PostgreSQL 17.11:
+
+- OpenMetadata: in `POSTGRES_COL_IDENTITY`, use `jsonb_build_object` and drop
+  the `::oid` cast. The subquery only runs on PostgreSQL 10+, which all have
+  `jsonb_build_object`, and `regclass` compares with `oid` without a cast.
+- RisingWave: bind `pg_collation_is_visible` to `true`, as it already does for
+  `pg_type_is_visible`. `pg_collation` is empty in RisingWave, so the stub
+  cannot give a wrong answer.
+
+With both, every required check passes on RisingWave; with either alone, the
+three column checks still fail. On PostgreSQL the changed query returns the same
+identity-column details, only with keys in `jsonb` order.
+
+An earlier version of this README said two missing functions were the whole
+gap. `what_if.py` skips the entire identity subquery, which hid the `oid` cast
+inside it; simulating the actual changes exposed it.
 
 Also found, and not RisingWave-specific:
 
@@ -37,7 +58,7 @@ Also found, and not RisingWave-specific:
 Upstream: [risingwavelabs/risingwave#27049](https://github.com/risingwavelabs/risingwave/issues/27049)
 asks for OpenMetadata support and
 [open-metadata/OpenMetadata#34060](https://github.com/open-metadata/OpenMetadata/issues/34060)
-for a native connector. Neither named these two functions when this was written.
+for a native connector. Neither named these gaps when this was written.
 
 ## Files
 
@@ -45,7 +66,7 @@ for a native connector. Neither named these two functions when this was written.
 |---|---|
 | `seed.py` | Seeds the same tables, comment, view and materialized view into both targets; RisingWave also gets a source and a sink |
 | `rw_probe.py` | The probe. `uv run python rw_probe.py risingwave` or `postgres` |
-| `what_if.py` | The probe with both blockers skipped; `--database empty_db` for the negative control |
+| `what_if.py` | The probe with the failing code paths skipped; `--database empty_db` for the negative control |
 | `check_findings.py` | Runs all four scenarios and asserts each one's exact set of failing checks |
 
 ## Run it

@@ -31,8 +31,8 @@ EMPTY_DB_CHECKS = COLUMN_CHECKS | {
 FINDINGS = {
     "postgres control": (["rw_probe.py", "postgres"], set()),
     "risingwave": (["rw_probe.py", "risingwave"], COLUMN_CHECKS),
-    "risingwave, both blockers skipped": (["what_if.py", "risingwave"], set()),
-    "risingwave empty database, blockers skipped": (["what_if.py", "risingwave", "--database", "empty_db"], EMPTY_DB_CHECKS),
+    "risingwave, failing code paths skipped": (["what_if.py", "risingwave"], set()),
+    "risingwave empty database, failing code paths skipped": (["what_if.py", "risingwave", "--database", "empty_db"], EMPTY_DB_CHECKS),
 }
 
 
