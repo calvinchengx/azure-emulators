@@ -1,0 +1,11 @@
+[project]
+name = "openmetadata-fabric-probe"
+version = "0.1.0"
+description = "Can OpenMetadata's open-source SQL Server connector catalog a Fabric Warehouse?"
+requires-python = ">=3.11,<3.14"
+# Pinned exactly: the probe answers the question for one connector release.
+# Bump it by hand and rerun the SQL Server control (README) before trusting it.
+dependencies = [
+    "openmetadata-ingestion[mssql]==2.0.2.0",
+    "pyodbc>=5.3.0",
+]
