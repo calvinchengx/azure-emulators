@@ -1,12 +1,14 @@
-"""What-if, not a fix: skip the two RisingWave blockers, then rerun the probe.
+"""What-if, not a fix: skip the code paths that fail on RisingWave, then rerun the probe.
 
-Blocker 1: the connector's column query adds POSTGRES_COL_IDENTITY, which calls
-json_build_object, whenever server_version_info >= (10,). Reporting (9, 6)
-removes exactly that subquery.
-Blocker 2: SQLAlchemy's domain lookup, which the connector's get_columns calls,
+Skip 1: the connector's column query adds POSTGRES_COL_IDENTITY whenever
+server_version_info >= (10,). Reporting (9, 6) removes that whole subquery, and
+with it two gaps: its json_build_object call and its ::oid cast.
+Skip 2: SQLAlchemy's domain lookup, which the connector's get_columns calls,
 uses pg_collation_is_visible. Returning no domains skips it.
 
-If every required check passes with both skipped, those two are the whole gap.
+A pass here shows nothing OUTSIDE those two code paths blocks the connector. It
+cannot count the gaps inside them: skipping the whole subquery hid the ::oid
+cast until the exact fixes were simulated (README).
 
   uv run python what_if.py risingwave                     # expect exit 0
   uv run python what_if.py risingwave --database empty_db # expect exit 1
