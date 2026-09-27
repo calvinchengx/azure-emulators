@@ -1,0 +1,43 @@
+name: OpenMetadata RisingWave probe
+
+# Runs probes/openmetadata-risingwave for real: a pinned RisingWave and a
+# PostgreSQL control in Docker, seeded, then check_findings.py asserts each
+# scenario's exact set of failing checks. Goes red when a RisingWave or
+# OpenMetadata change moves the findings, which is the point (README).
+on:
+  pull_request:
+    paths:
+      - probes/openmetadata-risingwave/**
+      - .github/workflows/openmetadata-risingwave-probe.yml
+  push:
+    branches: [main]
+    paths:
+      - probes/openmetadata-risingwave/**
+      - .github/workflows/openmetadata-risingwave-probe.yml
+
+permissions:
+  contents: read
+
+jobs:
+  findings:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: probes/openmetadata-risingwave
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - run: uv sync --locked
+      - name: Start RisingWave 3.1.0 and PostgreSQL 17.11
+        run: |
+          # The digest is what docker runs; the tag beside it is only a label.
+          docker run -d --name om-probe-rw -p 127.0.0.1:4566:4566 \
+            risingwavelabs/risingwave:v3.1.0@sha256:ee2e8e7a10b728d01b0e149d2a4f35864f0f52a0c889fa6cf9bc32c8ff46c602 single_node
+          docker run -d --name om-probe-pg -e POSTGRES_PASSWORD=probe-control \
+            -p 127.0.0.1:55432:5432 postgres:17.11
+      - run: uv run python seed.py risingwave
+      - run: uv run python seed.py postgres
+      - run: uv run python check_findings.py
+      - if: failure()
+        run: docker logs om-probe-rw 2>&1 | tail -50

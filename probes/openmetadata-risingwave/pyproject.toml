@@ -1,0 +1,10 @@
+[project]
+name = "openmetadata-risingwave-probe"
+version = "0.1.0"
+description = "Can OpenMetadata's Postgres connector catalog RisingWave?"
+requires-python = ">=3.11,<3.14"
+# Pinned exactly: the findings hold for this connector release. Bump it by hand,
+# rerun check_findings.py, and update the findings if they moved.
+dependencies = [
+    "openmetadata-ingestion[postgres]==2.0.2.0",
+]
