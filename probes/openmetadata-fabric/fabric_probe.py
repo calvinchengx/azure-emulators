@@ -101,7 +101,7 @@ def run(dry_run: bool) -> int:
     if dry_run:
         for leg, name, sql, _ in sql_checks(database, "dbo", "<table>"):
             print(f"[{leg}] {name}: {' '.join(sql.split())[:110]}")
-        print("[metadata] inspector: schemas, tables, views, columns, pk, fks, unique, view definition, comment")
+        print("[metadata] inspector: schemas, tables, views, columns, pk, fks (all tables), view definition, comment")
         return 0
 
     # PROBE_CONTROL=1 points the same checks at a plain SQL Server with a SQL login,
