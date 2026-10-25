@@ -58,7 +58,7 @@ jobs:
     steps:
       # Full history: the classifier diffs against the base, which a depth-1
       # checkout cannot see.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       # Beside the real classification, every time. A classifier that stopped
@@ -121,7 +121,7 @@ jobs:
     runs-on: ubuntu-latest # Docker + compose preinstalled
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Validate the compose file
         run: |
           docker compose -f docker-compose.yml config >/dev/null
@@ -150,7 +150,7 @@ jobs:
       APIM_EMULATOR_VERSION: latest
       DATABRICKS_EMULATOR_VERSION: latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Run the chain (:latest)
         run: ./e2e/chain/run.py
       - name: Diagnose on failure
@@ -166,7 +166,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Prove the gate can still fail before trusting that it passed. A
       # manifest naming a moved repo kept passing on GitHub's rename redirect,
       # so "it passed" and "it checked something" had come apart. No token
